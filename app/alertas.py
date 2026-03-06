@@ -1,6 +1,7 @@
 import smtplib
 import os
 import html
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -10,6 +11,47 @@ load_dotenv()
 
 
 def enviar_email(destinatario, assunto, corpo):
+    """
+    Envia e-mail utilizando, na seguinte ordem de prioridade:
+    1) SendGrid API (recomendado para produção / Railway)
+       Variáveis: SENDGRID_API_KEY, SENDGRID_FROM_EMAIL
+    2) SMTP padrão (Gmail), para uso local
+       Variáveis: EMAIL_REMETENTE, EMAIL_SENHA
+    """
+    sendgrid_key = os.getenv("SENDGRID_API_KEY")
+    sendgrid_from = os.getenv("SENDGRID_FROM_EMAIL")
+
+    if sendgrid_key and sendgrid_from:
+        headers = {
+            "Authorization": f"Bearer {sendgrid_key}",
+            "Content-Type": "application/json",
+        }
+        data = {
+            "personalizations": [{"to": [{"email": destinatario}]}],
+            "from": {"email": sendgrid_from},
+            "subject": assunto,
+            "content": [{"type": "text/html", "value": corpo}],
+        }
+
+        try:
+            resp = requests.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                headers=headers,
+                json=data,
+                timeout=10,
+            )
+            if resp.status_code in (200, 202):
+                print(f"E-mail enviado para {destinatario} via SendGrid")
+                return True
+            print(
+                f"Falha ao enviar e-mail via SendGrid: "
+                f"{resp.status_code} - {resp.text}"
+            )
+            return False
+        except Exception as e:
+            print(f"Erro ao enviar e-mail via SendGrid: {e}")
+            return False
+
     remetente = os.getenv("EMAIL_REMETENTE")
     senha = os.getenv("EMAIL_SENHA")
 
@@ -36,10 +78,10 @@ def enviar_email(destinatario, assunto, corpo):
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(remetente, senha)
             server.sendmail(remetente, destinatario, msg.as_string())
-        print(f"E-mail enviado para {destinatario}")
+        print(f"E-mail enviado para {destinatario} via SMTP")
         return True
     except Exception as e:
-        print(f"Erro ao enviar e-mail: {e}")
+        print(f"Erro ao enviar e-mail via SMTP: {e}")
         return False
 
 def montar_corpo_email(licitacoes):
