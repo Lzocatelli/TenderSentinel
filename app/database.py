@@ -1,5 +1,11 @@
 import psycopg2
 import os
+import os
+
+print("=== RAIO-X DO RAILWAY ===")
+chaves_banco = [k for k in os.environ.keys() if "DB" in k or "PG" in k or "URL" in k]
+print(f"Variáveis relacionadas a banco encontradas: {chaves_banco}")
+print("=========================")
 
 def conectar():
     # Pega a URL, se não existir retorna "", e tira os espaços vazios
