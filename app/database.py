@@ -1,8 +1,5 @@
 import psycopg2
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 def conectar():
     # Pega a URL, se não existir retorna "", e tira os espaços vazios
