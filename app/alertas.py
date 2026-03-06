@@ -8,9 +8,23 @@ from app.database import conectar
 
 load_dotenv()
 
+
 def enviar_email(destinatario, assunto, corpo):
     remetente = os.getenv("EMAIL_REMETENTE")
     senha = os.getenv("EMAIL_SENHA")
+
+    if not remetente or not senha:
+        missing = []
+        if not remetente:
+            missing.append("EMAIL_REMETENTE")
+        if not senha:
+            missing.append("EMAIL_SENHA")
+        raise RuntimeError(
+            "Configuração de e-mail incompleta. "
+            f"Defina as variáveis: {', '.join(missing)} "
+            "no .env (ambiente local) ou na configuração da Railway. "
+            "Para Gmail, prefira utilizar uma App Password."
+        )
 
     msg = MIMEMultipart()
     msg["From"] = remetente
