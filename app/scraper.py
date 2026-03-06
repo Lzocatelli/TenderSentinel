@@ -1,5 +1,6 @@
 import requests
 import os
+import time
 from datetime import date, timedelta
 from app.database import conectar
 
@@ -23,15 +24,29 @@ def buscar_licitacoes(data_inicio=None, data_fim=None, pagina=1):
             "codigoModalidadeContratacao": modalidade
         }
 
-        try:
-            response = requests.get(url, params=params, timeout=10)
-            if response.status_code == 200:
-                dados = response.json()
-                todas.extend(dados.get("data", []))
-            else:
-                print(f"Erro modalidade {modalidade}: {response.status_code}")
-        except Exception as e:
-            print(f"Erro na requisição: {e}")
+        # --- SISTEMA DE RESILIÊNCIA (TENTATIVAS) ---
+        tentativas = 3
+        for tentativa in range(tentativas):
+            try:
+                response = requests.get(url, params=params, timeout=30)
+                
+                if response.status_code == 200:
+                    dados = response.json()
+                    todas.extend(dados.get("data", []))
+                    break  # Sucesso! Sai do loop de tentativas e vai pra próxima modalidade
+                else:
+                    print(f"Erro modalidade {modalidade}: Status {response.status_code}")
+                    break  # Erro do servidor que não seja timeout, sai do loop
+                    
+            except requests.exceptions.Timeout:
+                print(f"Demora na resposta do PNCP (Tentativa {tentativa + 1}/{tentativas})...")
+                if tentativa < tentativas - 1:
+                    time.sleep(3)  # Espera 3 segundos antes de bater no servidor de novo
+                else:
+                    print(f"O PNCP não respondeu para a modalidade {modalidade} após {tentativas} tentativas.")
+            except Exception as e:
+                print(f"Erro na requisição: {e}")
+                break
 
     return todas
 

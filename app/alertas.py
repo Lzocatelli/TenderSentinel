@@ -1,5 +1,6 @@
 import smtplib
 import os
+import html
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -35,10 +36,22 @@ def montar_corpo_email(licitacoes):
     for l in licitacoes:
         valor = f"R$ {l[3]:,.2f}" if l[3] else "Não informado"
         link = f'<a href="{l[5]}">Ver licitação</a>' if l[5] else "Link não disponível"
+        
+        # Trata o texto nulo e limita o tamanho a 250 caracteres para não quebrar o layout
+        orgao_texto = str(l[1]) if l[1] else 'N/A'
+        objeto_texto = str(l[2]) if l[2] else 'N/A'
+        
+        if len(objeto_texto) > 250:
+            objeto_texto = objeto_texto[:247] + "..."
+
+        # Transforma caracteres perigosos (<, >, &) em texto inofensivo para o HTML
+        orgao_seguro = html.escape(orgao_texto)
+        objeto_seguro = html.escape(objeto_texto)
+
         itens += f"""
         <tr>
-            <td style="padding:8px;border-bottom:1px solid #eee">{l[1] or 'N/A'}</td>
-            <td style="padding:8px;border-bottom:1px solid #eee">{l[2] or 'N/A'}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee">{orgao_seguro}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee">{objeto_seguro}</td>
             <td style="padding:8px;border-bottom:1px solid #eee">{valor}</td>
             <td style="padding:8px;border-bottom:1px solid #eee">{link}</td>
         </tr>
