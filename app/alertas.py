@@ -1,0 +1,110 @@
+import smtplib
+import os
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+from app.database import conectar
+
+load_dotenv()
+
+def enviar_email(destinatario, assunto, corpo):
+    remetente = os.getenv("EMAIL_REMETENTE")
+    senha = os.getenv("EMAIL_SENHA")
+
+    msg = MIMEMultipart()
+    msg["From"] = remetente
+    msg["To"] = destinatario
+    msg["Subject"] = assunto
+    msg.attach(MIMEText(corpo, "html"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(remetente, senha)
+            server.sendmail(remetente, destinatario, msg.as_string())
+        print(f"E-mail enviado para {destinatario}")
+        return True
+    except Exception as e:
+        print(f"Erro ao enviar e-mail: {e}")
+        return False
+
+def montar_corpo_email(licitacoes):
+    if not licitacoes:
+        return ""
+
+    itens = ""
+    for l in licitacoes:
+        valor = f"R$ {l[3]:,.2f}" if l[3] else "Não informado"
+        link = f'<a href="{l[5]}">Ver licitação</a>' if l[5] else "Link não disponível"
+        itens += f"""
+        <tr>
+            <td style="padding:8px;border-bottom:1px solid #eee">{l[1] or 'N/A'}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee">{l[2] or 'N/A'}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee">{valor}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee">{link}</td>
+        </tr>
+        """
+
+    return f"""
+    <html>
+    <body style="font-family:Arial,sans-serif;color:#333">
+        <div style="max-width:800px;margin:auto;padding:20px">
+            <h2 style="color:#1B3A6B">🔔 LicitaBot — Novas Oportunidades</h2>
+            <p>Encontramos <strong>{len(licitacoes)} licitação(ões)</strong> relevantes para você hoje.</p>
+            <table style="width:100%;border-collapse:collapse">
+                <thead>
+                    <tr style="background:#1B3A6B;color:white">
+                        <th style="padding:10px;text-align:left">Órgão</th>
+                        <th style="padding:10px;text-align:left">Objeto</th>
+                        <th style="padding:10px;text-align:left">Valor</th>
+                        <th style="padding:10px;text-align:left">Link</th>
+                    </tr>
+                </thead>
+                <tbody>{itens}</tbody>
+            </table>
+            <p style="color:#888;font-size:12px;margin-top:20px">
+                LicitaBot — Monitor Inteligente de Licitações
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+
+def disparar_alertas():
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("SELECT id, nome, email, palavras_chave FROM clientes WHERE ativo = TRUE")
+    clientes = cur.fetchall()
+
+    for cliente in clientes:
+        cliente_id, nome, email, palavras_chave = cliente
+
+        from app.scraper import filtrar_por_palavra_chave
+        licitacoes = filtrar_por_palavra_chave(palavras_chave)
+
+        novas = []
+        for l in licitacoes:
+            cur.execute("""
+                SELECT id FROM alertas_enviados
+                WHERE cliente_id = %s AND licitacao_id = (
+                    SELECT id FROM licitacoes WHERE pncp_id = %s
+                )
+            """, (cliente_id, l[0]))
+            if not cur.fetchone():
+                novas.append(l)
+
+        if novas:
+            corpo = montar_corpo_email(novas)
+            assunto = f"LicitaBot — {len(novas)} nova(s) licitação(ões) para você"
+            enviado = enviar_email(email, assunto, corpo)
+
+            if enviado:
+                for l in novas:
+                    cur.execute("""
+                        INSERT INTO alertas_enviados (cliente_id, licitacao_id)
+                        VALUES (%s, (SELECT id FROM licitacoes WHERE pncp_id = %s))
+                    """, (cliente_id, l[0]))
+
+    conn.commit()
+    cur.close()
+    conn.close()
