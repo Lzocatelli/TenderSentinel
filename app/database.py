@@ -2,7 +2,7 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=False)
 
 def conectar():
     database_url = os.getenv("DATABASE_URL")
