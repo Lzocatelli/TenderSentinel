@@ -2,27 +2,19 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 
-
-load_dotenv(override=False)
+load_dotenv()
 
 def conectar():
-    database_url = os.getenv("DATABASE_URL")
-    
+    # Pega a URL, se não existir retorna "", e tira os espaços vazios
+    database_url = os.environ.get("DATABASE_URL", "").strip()
     
     if database_url:
-        
         if database_url.startswith("postgres://"):
             database_url = database_url.replace("postgres://", "postgresql://", 1)
         
-        print("Conectando via DATABASE_URL...")
+        print("Sucesso: Conectando via DATABASE_URL...")
         return psycopg2.connect(database_url)
     
-    
-    print("Conectando via variáveis individuais...")
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT", "5432"),
-        dbname=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD")
-    )
+    # Se chegou aqui, é porque a URL está literalmente vazia.
+    # O raise vai parar o app e mostrar esse erro claro no log do Railway.
+    raise ValueError("ERRO CRÍTICO: DATABASE_URL não foi encontrada ou está vazia no Railway. Verifique se deletou o .env do GitHub!")
