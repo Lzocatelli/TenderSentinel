@@ -15,17 +15,26 @@ if __name__ == "__main__":
     conn = conectar()
     cur = conn.cursor()
 
-    palavra_teste = "aquisição"
+    palavras_teste = [
+        "software",
+        "desenvolvimento de software",
+        "manutenção de software",
+        "licença de software",
+        "sistema de gestão",
+        "aplicação web",
+        "aplicativo",
+        "serviços de TI",
+    ]
     meu_email = "luizzocatelli2014@gmail.com"  # O e-mail que vai receber o alerta
 
     cur.execute(
         """
         INSERT INTO clientes (nome, email, palavras_chave, ativo) 
-        VALUES ('Teste Local', %s, ARRAY[%s], TRUE)
+        VALUES ('Teste Local', %s, %s, TRUE)
         ON CONFLICT (email) DO UPDATE 
-        SET palavras_chave = ARRAY[%s];
+        SET palavras_chave = %s;
     """,
-        (meu_email, palavra_teste, palavra_teste),
+        (meu_email, palavras_teste, palavras_teste),
     )
 
     # Limpa os registros anteriores de alertas para o teste
@@ -34,7 +43,7 @@ if __name__ == "__main__":
     cur.close()
     conn.close()
 
-    print(f"\n3. Procurando '{palavra_teste}' e disparando alertas...")
+    print("\n3. Disparando alertas para o cliente de teste...")
     disparar_alertas()
 
     print("\nTeste completo finalizado!")
