@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicitaBot — Monitor Inteligente de Licitações</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<nav>
+    <a href="/" class="nav-logo">Licita<span>Bot</span></a>
+    <div class="nav-links">
+        <a href="/login">Entrar</a>
+        <a href="/cadastro" class="btn btn-primary" style="padding:0.5rem 1.25rem">Começar grátis</a>
+    </div>
+</nav>
+
+<section class="hero">
+    <h1>Nunca perca uma<br><span>licitação pública</span></h1>
+    <p>Monitoramos o PNCP e enviamos alertas personalizados toda vez que surgir uma oportunidade para o seu negócio.</p>
+    <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+        <a href="/cadastro" class="btn btn-gold">Criar conta grátis</a>
+        <a href="#planos" class="btn btn-outline">Ver planos</a>
+    </div>
+</section>
+
+<div style="background:var(--navy);padding:2rem;text-align:center">
+    <p style="color:rgba(255,255,255,0.6);font-size:0.82rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:0.5rem">Licitações publicadas hoje no PNCP</p>
+    <p id="contador" style="font-family:'DM Serif Display',serif;font-size:3rem;color:var(--gold);line-height:1">{{ total_hoje }}</p>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.82rem;margin-top:0.5rem">oportunidades monitoradas automaticamente</p>
+</div>
+
+<script>
+    async function atualizarContador() {
+        try {
+            const r = await fetch('/api/contador');
+            const data = await r.json();
+            document.getElementById('contador').textContent = data.total.toLocaleString('pt-BR');
+        } catch (e) {}
+    }
+    setInterval(atualizarContador, 5 * 60 * 1000);
+</script>
+
+<div style="background:var(--white);border-top:1px solid var(--gray-100);border-bottom:1px solid var(--gray-100)">
+    <div class="section" style="padding:4rem 2rem">
+        <h2 class="section-title">Como funciona</h2>
+        <p class="section-subtitle">Em menos de 2 minutos você está recebendo alertas.</p>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:2rem;margin-top:1rem">
+            <div style="text-align:center;padding:2rem">
+                <div style="width:56px;height:56px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-family:'DM Serif Display',serif;font-size:1.4rem;color:var(--gold)">1</div>
+                <h3 style="font-family:'DM Serif Display',serif;font-size:1.2rem;color:var(--navy);margin-bottom:0.75rem">Crie sua conta</h3>
+                <p style="color:var(--gray-500);font-size:0.9rem;line-height:1.6">Cadastre seu nome, e-mail e defina as palavras-chave do seu setor. Leva menos de 2 minutos.</p>
+            </div>
+
+            <div style="text-align:center;padding:2rem">
+                <div style="width:56px;height:56px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-family:'DM Serif Display',serif;font-size:1.4rem;color:var(--gold)">2</div>
+                <h3 style="font-family:'DM Serif Display',serif;font-size:1.2rem;color:var(--navy);margin-bottom:0.75rem">Monitoramos por você</h3>
+                <p style="color:var(--gray-500);font-size:0.9rem;line-height:1.6">Todo dia às 9h varremos o Portal Nacional de Contratações Públicas em busca de oportunidades para o seu negócio.</p>
+            </div>
+
+            <div style="text-align:center;padding:2rem">
+                <div style="width:56px;height:56px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-family:'DM Serif Display',serif;font-size:1.4rem;color:var(--gold)">3</div>
+                <h3 style="font-family:'DM Serif Display',serif;font-size:1.2rem;color:var(--navy);margin-bottom:0.75rem">Receba os alertas</h3>
+                <p style="color:var(--gray-500);font-size:0.9rem;line-height:1.6">Você recebe um e-mail com todas as licitações relevantes do dia, prontas para você analisar e participar.</p>
+            </div>
+        </div>
+
+        <div style="text-align:center;margin-top:2.5rem">
+            <a href="/cadastro" class="btn btn-primary">Comece agora — é grátis</a>
+        </div>
+    </div>
+</div>
+
+<div class="section" id="planos">
+    <h2 class="section-title">Planos e Preços</h2>
+    <p class="section-subtitle">Escolha o plano ideal para o seu negócio. Cancele quando quiser.</p>
+
+    <div class="plans-grid">
+        <div class="plan-card">
+            <p class="plan-name">Básico</p>
+            <p class="plan-price">R$ 99<span>/mês</span></p>
+            <ul class="plan-features">
+                <li>5 palavras-chave monitoradas</li>
+                <li>Alertas diários por e-mail</li>
+                <li>Acesso ao dashboard</li>
+            </ul>
+            <a href="/cadastro" class="btn btn-primary btn-block">Começar agora</a>
+        </div>
+
+        <div class="plan-card featured">
+            <div class="plan-badge">Mais popular</div>
+            <p class="plan-name">Profissional</p>
+            <p class="plan-price">R$ 249<span>/mês</span></p>
+            <ul class="plan-features">
+                <li>20 palavras-chave monitoradas</li>
+                <li>Alertas por e-mail e WhatsApp</li>
+                <li>Relatório semanal de oportunidades</li>
+                <li>Score de oportunidade</li>
+                <li>Acesso ao dashboard</li>
+            </ul>
+            <a href="/cadastro" class="btn btn-gold btn-block">Começar agora</a>
+        </div>
+
+        <div class="plan-card">
+            <p class="plan-name">Agência</p>
+            <p class="plan-price">R$ 499<span>/mês</span></p>
+            <ul class="plan-features">
+                <li>Palavras-chave ilimitadas</li>
+                <li>Tudo do plano Profissional</li>
+                <li>Gestão multi-cliente</li>
+                <li>Histórico completo</li>
+            </ul>
+            <a href="/cadastro" class="btn btn-primary btn-block">Começar agora</a>
+        </div>
+    </div>
+</div>
+
+<footer>
+    <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
+</footer>
+
+</body>
+</html>

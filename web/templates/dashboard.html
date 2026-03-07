@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — LicitaBot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<nav>
+    <a href="/" class="nav-logo">Licita<span>Bot</span></a>
+    <div class="nav-links">
+        <span style="color:rgba(255,255,255,0.6);font-size:0.9rem">{{ cliente.nome }}</span>
+        <a href="/logout">Sair</a>
+    </div>
+</nav>
+
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">Olá, <span>{{ cliente.nome.split()[0] }}</span>!</h1>
+    </div>
+
+    <div class="keywords-bar">
+        <span class="keywords-label">Monitorando</span>
+        {% for palavra in cliente.palavras_chave %}
+            <span class="keyword-tag">{{ palavra }}</span>
+        {% endfor %}
+    </div>
+
+    <div class="table-container">
+        <div class="table-header">
+            <h2>Licitações encontradas</h2>
+            <span style="font-size:0.82rem;color:var(--gray-500)">Alertas enviados às 9h diariamente</span>
+        </div>
+
+        {% if licitacoes %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Órgão</th>
+                    <th>Objeto</th>
+                    <th>Valor estimado</th>
+                    <th>Data</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for l in licitacoes %}
+                <tr>
+                    <td class="td-orgao">{{ l[0] or 'N/A' }}</td>
+                    <td class="td-objeto">{{ l[1] or 'N/A' }}</td>
+                    <td class="td-valor">{% if l[2] %}R$ {{ "%.2f"|format(l[2]|float) }}{% else %}—{% endif %}</td>
+                    <td style="color:var(--gray-500)">{{ l[3] or '—' }}</td>
+                    <td>{% if l[4] %}<a href="{{ l[4] }}" target="_blank" class="link-ver">Ver</a>{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <strong>Nenhuma licitação encontrada ainda.</strong>
+            <p>Os alertas rodam às 9h. Você receberá um e-mail quando surgir uma oportunidade.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<footer>
+    <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
+</footer>
+
+</body>
+</html>

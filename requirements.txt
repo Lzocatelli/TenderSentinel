@@ -2,3 +2,6 @@ requests
 psycopg2-binary
 python-dotenv
 apscheduler
+flask
+flask-login
+werkzeug
