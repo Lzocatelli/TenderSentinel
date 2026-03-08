@@ -5,3 +5,4 @@ apscheduler
 flask
 flask-login
 werkzeug
+gunicorn
