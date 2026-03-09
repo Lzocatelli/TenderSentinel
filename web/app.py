@@ -51,7 +51,14 @@ def load_user(user_id):
         return Cliente(row[0], row[1], row[2], row[3], row[4])
     return None
 
+_cache_contador = {"total": 0, "atualizado_em": None}
+
 def contar_licitacoes_hoje():
+    from datetime import datetime, timedelta
+    agora = datetime.utcnow()
+    if _cache_contador["atualizado_em"] and agora - _cache_contador["atualizado_em"] < timedelta(minutes=5):
+        return _cache_contador["total"]
+
     hoje = date.today().strftime("%Y%m%d")
     url = "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao"
     total = 0
@@ -76,6 +83,9 @@ def contar_licitacoes_hoje():
                     break
             except:
                 break
+
+    _cache_contador["total"] = total
+    _cache_contador["atualizado_em"] = agora
     return total
 
 @app.route("/")
