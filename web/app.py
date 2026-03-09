@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.database import conectar
 from app.alertas import enviar_email
 import requests
+import stripe
 import os
 from datetime import date
 from dotenv import load_dotenv
@@ -13,27 +14,41 @@ load_dotenv(override=False)
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "licitabot2026")
 
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+PLANO_LIMITES = {"basico": 5, "profissional": 20, "agencia": None}
+
+def limite_palavras(plano):
+    if not plano:
+        return 2
+    return PLANO_LIMITES.get(plano)
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
 class Cliente(UserMixin):
-    def __init__(self, id, nome, email, palavras_chave):
+    def __init__(self, id, nome, email, palavras_chave, plano=None):
         self.id = id
         self.nome = nome
         self.email = email
-        self.palavras_chave = palavras_chave
+        self.palavras_chave = palavras_chave or []
+        self.plano = plano
+
+    @property
+    def limite_palavras(self):
+        return limite_palavras(self.plano)
 
 @login_manager.user_loader
 def load_user(user_id):
     conn = conectar()
     cur = conn.cursor()
-    cur.execute("SELECT id, nome, email, palavras_chave FROM clientes WHERE id = %s", (user_id,))
+    cur.execute("SELECT id, nome, email, palavras_chave, plano FROM clientes WHERE id = %s", (user_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
     if row:
-        return Cliente(*row)
+        return Cliente(row[0], row[1], row[2], row[3], row[4])
     return None
 
 def contar_licitacoes_hoje():
@@ -77,6 +92,11 @@ def cadastro():
         palavras = request.form.get("palavras_chave", "")
         palavras_lista = [p.strip() for p in palavras.split(",") if p.strip()]
 
+        limite_free = 2
+        if len(palavras_lista) > limite_free:
+            flash(f"No plano gratuito você pode cadastrar até {limite_free} palavras-chave. As primeiras foram salvas.", "info")
+            palavras_lista = palavras_lista[:limite_free]
+
         conn = conectar()
         cur = conn.cursor()
         cur.execute("SELECT id FROM clientes WHERE email = %s", (email,))
@@ -112,13 +132,13 @@ def login():
 
         conn = conectar()
         cur = conn.cursor()
-        cur.execute("SELECT id, nome, email, palavras_chave, senha FROM clientes WHERE email = %s", (email,))
+        cur.execute("SELECT id, nome, email, palavras_chave, senha, plano FROM clientes WHERE email = %s", (email,))
         row = cur.fetchone()
         cur.close()
         conn.close()
 
         if row and check_password_hash(row[4], senha):
-            cliente = Cliente(row[0], row[1], row[2], row[3])
+            cliente = Cliente(row[0], row[1], row[2], row[3], row[5])
             login_user(cliente)
             return redirect(url_for("dashboard"))
 
@@ -152,9 +172,100 @@ def dashboard():
 
 @app.route("/api/contador")
 def api_contador():
-    from flask import jsonify
     total = contar_licitacoes_hoje()
     return jsonify({"total": total})
+
+@app.route("/health")
+def health():
+    try:
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.close()
+        conn.close()
+        return jsonify({"status": "ok", "database": "ok"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "database": str(e)}), 503
+
+@app.route("/assinar/<plano>")
+@login_required
+def assinar(plano):
+    precos = {
+        "basico": os.getenv("STRIPE_PRICE_BASICO"),
+        "profissional": os.getenv("STRIPE_PRICE_PROFISSIONAL"),
+        "agencia": os.getenv("STRIPE_PRICE_AGENCIA"),
+    }
+    price_id = precos.get(plano)
+    if not price_id:
+        flash("Plano inválido.", "erro")
+        return redirect(url_for("index"))
+
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        mode="subscription",
+        line_items=[{"price": price_id, "quantity": 1}],
+        customer_email=current_user.email,
+        metadata={"cliente_id": current_user.id},
+        success_url=request.host_url + "pagamento/sucesso",
+        cancel_url=request.host_url + "pagamento/cancelado",
+    )
+    return redirect(session.url, code=303)
+
+@app.route("/pagamento/sucesso")
+@login_required
+def pagamento_sucesso():
+    return render_template("pagamento_sucesso.html")
+
+@app.route("/pagamento/cancelado")
+@login_required
+def pagamento_cancelado():
+    flash("Pagamento cancelado. Nenhuma cobrança foi feita.", "info")
+    return redirect(url_for("index"))
+
+@app.route("/webhook/stripe", methods=["POST"])
+def webhook_stripe():
+    payload = request.data
+    sig_header = request.headers.get("Stripe-Signature")
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+    except Exception:
+        return "", 400
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        cliente_id = session["metadata"].get("cliente_id")
+        subscription_id = session.get("subscription")
+        customer_id = session.get("customer")
+        plano = "basico"
+        for item in stripe.checkout.Session.list_line_items(session["id"]).data:
+            price_id = item.price.id
+            if price_id == os.getenv("STRIPE_PRICE_PROFISSIONAL"):
+                plano = "profissional"
+            elif price_id == os.getenv("STRIPE_PRICE_AGENCIA"):
+                plano = "agencia"
+
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE clientes SET plano = %s, stripe_customer_id = %s, stripe_subscription_id = %s
+            WHERE id = %s
+        """, (plano, customer_id, subscription_id, cliente_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+    elif event["type"] == "customer.subscription.deleted":
+        subscription_id = event["data"]["object"]["id"]
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("UPDATE clientes SET plano = 'gratuito' WHERE stripe_subscription_id = %s", (subscription_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+    return "", 200
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

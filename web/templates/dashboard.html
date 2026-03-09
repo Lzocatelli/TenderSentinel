@@ -19,6 +19,11 @@
 <div class="dashboard">
     <div class="dashboard-header">
         <h1 class="dashboard-title">Olá, <span>{{ cliente.nome.split()[0] }}</span>!</h1>
+        <p style="font-size:0.9rem;color:var(--gray-500);margin-top:0.25rem">
+            Plano: <strong style="text-transform:capitalize">{{ cliente.plano or 'Gratuito' }}</strong>
+            ({{ cliente.limite_palavras if cliente.limite_palavras else '∞' }} palavras)
+            — <a href="{{ url_for('planos') }}" style="color:var(--blue)">Assinar ou alterar</a>
+        </p>
     </div>
 
     <div class="keywords-bar">

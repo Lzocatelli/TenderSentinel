@@ -6,3 +6,4 @@ flask
 flask-login
 werkzeug
 gunicorn
+stripe

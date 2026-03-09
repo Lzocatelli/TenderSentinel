@@ -62,11 +62,25 @@ def criar_tabelas():
             id SERIAL PRIMARY KEY,
             nome TEXT,
             email TEXT UNIQUE,
+            senha TEXT,
             palavras_chave TEXT[],
             ativo BOOLEAN DEFAULT TRUE,
+            plano TEXT,
+            stripe_customer_id TEXT,
+            stripe_subscription_id TEXT,
             criado_em TIMESTAMP DEFAULT NOW()
         );
     """)
+
+    for col, tipo in [
+        ("plano", "TEXT"),
+        ("stripe_customer_id", "TEXT"),
+        ("stripe_subscription_id", "TEXT"),
+    ]:
+        try:
+            cur.execute(f"ALTER TABLE clientes ADD COLUMN IF NOT EXISTS {col} {tipo};")
+        except Exception:
+            pass
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS alertas_enviados (

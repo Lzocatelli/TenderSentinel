@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planos — LicitaBot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<nav>
+    <a href="/" class="nav-logo">Licita<span>Bot</span></a>
+    <div class="nav-links">
+        <a href="/dashboard">Dashboard</a>
+        <span style="color:rgba(255,255,255,0.6);font-size:0.9rem">{{ cliente.nome }}</span>
+        <a href="/logout">Sair</a>
+    </div>
+</nav>
+
+<div class="section" style="padding:4rem 2rem">
+    <h1 class="section-title">Escolha seu plano</h1>
+    <p class="section-subtitle">Assinatura mensal. Cancele quando quiser pelo painel do Stripe.</p>
+
+    {% if cliente.plano %}
+    <p style="text-align:center;margin-bottom:2rem;color:var(--gray-500)">
+        Seu plano atual: <strong style="color:var(--navy);text-transform:capitalize">{{ cliente.plano }}</strong>
+    </p>
+    {% endif %}
+
+    <div class="plans-grid">
+        <div class="plan-card {% if cliente.plano == 'basico' %}featured{% endif %}">
+            {% if cliente.plano == 'basico' %}<div class="plan-badge">Seu plano</div>{% endif %}
+            <p class="plan-name">Básico</p>
+            <p class="plan-price">R$ 99<span>/mês</span></p>
+            <ul class="plan-features">
+                <li>5 palavras-chave monitoradas</li>
+                <li>Alertas diários por e-mail</li>
+                <li>Acesso ao dashboard</li>
+            </ul>
+            {% if pagarme_habilitado %}
+            <form action="{{ url_for('criar_sessao_checkout') }}" method="post" style="margin:0">
+                <input type="hidden" name="plano" value="basico">
+                <button type="submit" class="btn btn-primary btn-block">{% if cliente.plano == 'basico' %}Plano atual{% else %}Assinar{% endif %}</button>
+            </form>
+            {% else %}
+            <p class="plan-price" style="font-size:0.9rem;color:var(--gray-500)">Em breve</p>
+            {% endif %}
+        </div>
+
+        <div class="plan-card featured">
+            <div class="plan-badge">Mais popular</div>
+            {% if cliente.plano == 'profissional' %}<div class="plan-badge" style="top:2.5rem">Seu plano</div>{% endif %}
+            <p class="plan-name">Profissional</p>
+            <p class="plan-price">R$ 249<span>/mês</span></p>
+            <ul class="plan-features">
+                <li>20 palavras-chave monitoradas</li>
+                <li>Alertas por e-mail e WhatsApp</li>
+                <li>Relatório semanal de oportunidades</li>
+                <li>Score de oportunidade</li>
+                <li>Acesso ao dashboard</li>
+            </ul>
+            {% if pagarme_habilitado %}
+            <form action="{{ url_for('criar_sessao_checkout') }}" method="post" style="margin:0">
+                <input type="hidden" name="plano" value="profissional">
+                <button type="submit" class="btn btn-gold btn-block">{% if cliente.plano == 'profissional' %}Plano atual{% else %}Assinar{% endif %}</button>
+            </form>
+            {% else %}
+            <p class="plan-price" style="font-size:0.9rem;color:var(--gray-500)">Em breve</p>
+            {% endif %}
+        </div>
+
+        <div class="plan-card {% if cliente.plano == 'agencia' %}featured{% endif %}">
+            {% if cliente.plano == 'agencia' %}<div class="plan-badge">Seu plano</div>{% endif %}
+            <p class="plan-name">Agência</p>
+            <p class="plan-price">R$ 499<span>/mês</span></p>
+            <ul class="plan-features">
+                <li>Palavras-chave ilimitadas</li>
+                <li>Tudo do plano Profissional</li>
+                <li>Gestão multi-cliente</li>
+                <li>Histórico completo</li>
+            </ul>
+            {% if pagarme_habilitado %}
+            <form action="{{ url_for('criar_sessao_checkout') }}" method="post" style="margin:0">
+                <input type="hidden" name="plano" value="agencia">
+                <button type="submit" class="btn btn-primary btn-block">{% if cliente.plano == 'agencia' %}Plano atual{% else %}Assinar{% endif %}</button>
+            </form>
+            {% else %}
+            <p class="plan-price" style="font-size:0.9rem;color:var(--gray-500)">Em breve</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <p style="text-align:center;margin-top:2rem;font-size:0.85rem;color:var(--gray-500)">
+        Pagamento seguro via Pagar.me (cartão, boleto ou PIX). Ao assinar, você será redirecionado ao checkout.
+    </p>
+</div>
+
+<footer>
+    <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
+</footer>
+
+</body>
+</html>

@@ -142,11 +142,18 @@ def disparar_alertas():
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute("SELECT id, nome, email, palavras_chave FROM clientes WHERE ativo = TRUE")
+    cur.execute("SELECT id, nome, email, palavras_chave, plano FROM clientes WHERE ativo = TRUE")
     clientes = cur.fetchall()
 
-    for cliente in clientes:
-        cliente_id, nome, email, palavras_chave = cliente
+    for cliente_row in clientes:
+        cliente_id, nome, email, palavras_chave, plano = cliente_row
+        palavras_chave = palavras_chave or []
+
+        # Aplicar limite do plano (gratuito=2, basico=5, profissional=20, agencia=ilimitado)
+        limites = {None: 2, "basico": 5, "profissional": 20, "agencia": None}
+        limite = limites.get(plano, 2)
+        if limite is not None and len(palavras_chave) > limite:
+            palavras_chave = palavras_chave[:limite]
 
         from app.scraper import filtrar_por_palavra_chave
         licitacoes = filtrar_por_palavra_chave(palavras_chave)
