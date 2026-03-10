@@ -277,13 +277,13 @@ def webhook_stripe():
 
     return "", 200
 
-    @app.route("/editar-palavras", methods=["GET", "POST"])
+@app.route("/editar-palavras", methods=["GET", "POST"])
 @login_required
 def editar_palavras():
     if request.method == "POST":
         palavras = request.form.get("palavras_chave", "")
         palavras_lista = [p.strip() for p in palavras.split(",") if p.strip()]
-        
+
         limite = current_user.limite_palavras
         if limite is not None and len(palavras_lista) > limite:
             flash(f"Seu plano permite até {limite} palavras-chave. As primeiras {limite} foram salvas.", "info")
