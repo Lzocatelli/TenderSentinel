@@ -90,8 +90,7 @@ def contar_licitacoes_hoje():
 
 @app.route("/")
 def index():
-    total_hoje = contar_licitacoes_hoje()
-    return render_template("index.html", total_hoje=total_hoje)
+    return render_template("index.html", total_hoje=0)
 
 @app.route("/cadastro", methods=["GET", "POST"])
 def cadastro():

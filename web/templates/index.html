@@ -39,6 +39,7 @@
             document.getElementById('contador').textContent = data.total.toLocaleString('pt-BR');
         } catch (e) {}
     }
+    atualizarContador();
     setInterval(atualizarContador, 5 * 60 * 1000);
 </script>
 
