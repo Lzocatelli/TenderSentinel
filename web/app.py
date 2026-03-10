@@ -277,5 +277,29 @@ def webhook_stripe():
 
     return "", 200
 
+    @app.route("/editar-palavras", methods=["GET", "POST"])
+@login_required
+def editar_palavras():
+    if request.method == "POST":
+        palavras = request.form.get("palavras_chave", "")
+        palavras_lista = [p.strip() for p in palavras.split(",") if p.strip()]
+        
+        limite = current_user.limite_palavras
+        if limite is not None and len(palavras_lista) > limite:
+            flash(f"Seu plano permite até {limite} palavras-chave. As primeiras {limite} foram salvas.", "info")
+            palavras_lista = palavras_lista[:limite]
+
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("UPDATE clientes SET palavras_chave = %s WHERE id = %s", (palavras_lista, current_user.id))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        flash("Palavras-chave atualizadas com sucesso!", "sucesso")
+        return redirect(url_for("dashboard"))
+
+    return render_template("editar_palavras.html", cliente=current_user)
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

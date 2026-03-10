@@ -27,11 +27,12 @@
     </div>
 
     <div class="keywords-bar">
-        <span class="keywords-label">Monitorando</span>
-        {% for palavra in cliente.palavras_chave %}
-            <span class="keyword-tag">{{ palavra }}</span>
-        {% endfor %}
-    </div>
+    <span class="keywords-label">Monitorando</span>
+    {% for palavra in cliente.palavras_chave %}
+        <span class="keyword-tag">{{ palavra }}</span>
+    {% endfor %}
+    <a href="/editar-palavras" style="margin-left:auto;font-size:0.82rem;color:var(--blue);text-decoration:none;font-weight:500">Editar</a>
+</div>
 
     <div class="table-container">
         <div class="table-header">
