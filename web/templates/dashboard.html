@@ -25,7 +25,15 @@
             — <a href="/#planos" style="color:var(--blue)">Assinar ou alterar</a>
         </p>
     </div>
-
+{% if not cliente.plano %}
+<div style="background:linear-gradient(135deg,var(--navy) 0%,var(--navy-light) 100%);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+    <div>
+        <p style="color:var(--gold);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem">Você está no plano gratuito</p>
+        <p style="color:rgba(255,255,255,0.75);font-size:0.85rem">Monitore até 2 palavras-chave. Assine um plano para monitorar mais e receber alertas avançados.</p>
+    </div>
+    <a href="/#planos" class="btn btn-gold" style="white-space:nowrap;padding:0.6rem 1.5rem;font-size:0.875rem">Ver planos</a>
+</div>
+{% endif %}
     <div class="keywords-bar">
     <span class="keywords-label">Monitorando</span>
     {% for palavra in cliente.palavras_chave %}
