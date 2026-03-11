@@ -403,5 +403,25 @@ def editar_palavras():
 
     return render_template("editar_palavras.html", cliente=current_user)
 
+@app.route("/gerenciar-assinatura")
+@login_required
+def gerenciar_assinatura():
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("SELECT stripe_customer_id FROM clientes WHERE id = %s", (current_user.id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not row or not row[0]:
+        flash("Nenhuma assinatura encontrada.", "info")
+        return redirect(url_for("dashboard"))
+
+    session = stripe.billing_portal.Session.create(
+        customer=row[0],
+        return_url=request.host_url + "dashboard",
+    )
+    return redirect(session.url, code=303)
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
