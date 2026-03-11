@@ -196,7 +196,7 @@ def health():
     except Exception as e:
         return jsonify({"status": "error", "database": str(e)}), 503
 
-@@app.route("/assinar/<plano>")
+@app.route("/assinar/<plano>")
 @login_required
 def assinar(plano):
     periodo = request.args.get("periodo", "mensal")
