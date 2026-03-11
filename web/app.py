@@ -199,8 +199,13 @@ def health():
 @app.route("/assinar/<plano>")
 @login_required
 def assinar(plano):
+    # CORREÇÃO 2: bloqueia se já tem assinatura ativa
+    if current_user.plano in ('basico', 'profissional', 'agencia'):
+        flash("Você já possui uma assinatura ativa. Para trocar de plano, cancele o atual primeiro.", "info")
+        return redirect(url_for("dashboard"))
+
     periodo = request.args.get("periodo", "mensal")
-    
+
     precos = {
         "basico": os.getenv("STRIPE_PRICE_BASICO"),
         "profissional": os.getenv("STRIPE_PRICE_PROFISSIONAL"),
@@ -217,11 +222,23 @@ def assinar(plano):
         flash("Plano inválido.", "erro")
         return redirect(url_for("index"))
 
+    # CORREÇÃO 1: reutiliza customer_id existente para evitar duplicatas
+    customer_id = None
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("SELECT stripe_customer_id FROM clientes WHERE id = %s", (current_user.id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    if row and row[0]:
+        customer_id = row[0]
+
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         mode="subscription",
         line_items=[{"price": price_id, "quantity": 1}],
-        customer_email=current_user.email,
+        customer=customer_id if customer_id else None,
+        customer_email=None if customer_id else current_user.email,
         metadata={"cliente_id": current_user.id},
         subscription_data={"trial_period_days": 7},
         success_url=request.host_url + "pagamento/sucesso",
@@ -233,7 +250,7 @@ def assinar(plano):
 @login_required
 def buscar_agora():
     from app.scraper import buscar_licitacoes, salvar_licitacoes, filtrar_por_palavra_chave
-    from app.alertas import enviar_email
+    from app.alertas import montar_corpo_email
     from app.database import conectar
 
     try:
@@ -256,7 +273,6 @@ def buscar_agora():
                 novas_para_cliente.append(l)
 
         if novas_para_cliente:
-            from app.alertas import montar_corpo_email
             corpo = montar_corpo_email(novas_para_cliente)
             assunto = f"LicitaBot — {len(novas_para_cliente)} nova(s) licitação(ões) encontradas agora"
             enviado = enviar_email(current_user.email, assunto, corpo)
@@ -305,23 +321,49 @@ def webhook_stripe():
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
+        session_id = session["id"]
+
+        # CORREÇÃO 4: valida cliente_id do metadata
         cliente_id = session["metadata"].get("cliente_id")
+        if not cliente_id:
+            return "", 200
+
         subscription_id = session.get("subscription")
         customer_id = session.get("customer")
-        plano = "basico"
-        for item in stripe.checkout.Session.list_line_items(session["id"]).data:
-            price_id = item.price.id
-            if price_id == os.getenv("STRIPE_PRICE_PROFISSIONAL"):
-                plano = "profissional"
-            elif price_id == os.getenv("STRIPE_PRICE_AGENCIA"):
-                plano = "agencia"
 
+        # CORREÇÃO 3: idempotência — ignora se já processou este session_id
         conn = conectar()
         cur = conn.cursor()
+        cur.execute("SELECT stripe_last_session_id FROM clientes WHERE id = %s", (cliente_id,))
+        row = cur.fetchone()
+        if row and row[0] == session_id:
+            cur.close()
+            conn.close()
+            return "", 200
+
+        # CORREÇÃO 4: valida que customer_id bate com o cliente
         cur.execute("""
-            UPDATE clientes SET plano = %s, stripe_customer_id = %s, stripe_subscription_id = %s
+            SELECT id FROM clientes
+            WHERE id = %s AND (stripe_customer_id = %s OR stripe_customer_id IS NULL)
+        """, (cliente_id, customer_id))
+        if not cur.fetchone():
+            cur.close()
+            conn.close()
+            return "", 200
+
+        plano = "basico"
+        for item in stripe.checkout.Session.list_line_items(session_id).data:
+            price_id = item.price.id
+            if price_id in (os.getenv("STRIPE_PRICE_PROFISSIONAL"), os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL")):
+                plano = "profissional"
+            elif price_id in (os.getenv("STRIPE_PRICE_AGENCIA"), os.getenv("STRIPE_PRICE_AGENCIA_ANUAL")):
+                plano = "agencia"
+
+        cur.execute("""
+            UPDATE clientes
+            SET plano = %s, stripe_customer_id = %s, stripe_subscription_id = %s, stripe_last_session_id = %s
             WHERE id = %s
-        """, (plano, customer_id, subscription_id, cliente_id))
+        """, (plano, customer_id, subscription_id, session_id, cliente_id))
         conn.commit()
         cur.close()
         conn.close()
@@ -330,7 +372,7 @@ def webhook_stripe():
         subscription_id = event["data"]["object"]["id"]
         conn = conectar()
         cur = conn.cursor()
-        cur.execute("UPDATE clientes SET plano = 'gratuito' WHERE stripe_subscription_id = %s", (subscription_id,))
+        cur.execute("UPDATE clientes SET plano = NULL WHERE stripe_subscription_id = %s", (subscription_id,))
         conn.commit()
         cur.close()
         conn.close()
