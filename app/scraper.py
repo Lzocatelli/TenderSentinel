@@ -28,7 +28,7 @@ def buscar_licitacoes(data_inicio=None, data_fim=None, pagina=1):
         tentativas = 3
         for tentativa in range(tentativas):
             try:
-                response = requests.get(url, params=params, timeout=30)
+                response = requests.get(url, params=params, timeout=8)
                 
                 if response.status_code == 200:
                     dados = response.json()
