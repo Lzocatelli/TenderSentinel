@@ -458,13 +458,24 @@ def webhook_stripe():
                 plano = "agencia"
 
         cur.execute("""
-            UPDATE clientes
-            SET plano = %s, stripe_customer_id = %s, stripe_subscription_id = %s, stripe_last_session_id = %s
-            WHERE id = %s
-        """, (plano, customer_id, subscription_id, session_id, cliente_id))
-        conn.commit()
-        cur.close()
-        conn.close()
+    UPDATE clientes
+    SET plano = %s, stripe_customer_id = %s, stripe_subscription_id = %s, stripe_last_session_id = %s
+    WHERE id = %s
+""", (plano, customer_id, subscription_id, session_id, cliente_id))
+
+# Auto-cadastra cliente na newsletter ao assinar
+cur.execute("SELECT id FROM newsletter WHERE email = (SELECT email FROM clientes WHERE id = %s)", (cliente_id,))
+if not cur.fetchone():
+    token_nl = secrets.token_urlsafe(32)
+    cur.execute("""
+        INSERT INTO newsletter (email, nome, token_descadastro)
+        SELECT email, nome, %s FROM clientes WHERE id = %s
+        ON CONFLICT (email) DO NOTHING
+    """, (token_nl, cliente_id))
+
+conn.commit()
+cur.close()
+conn.close()
 
     elif event["type"] == "customer.subscription.deleted":
         subscription_id = event["data"]["object"]["id"]
@@ -520,6 +531,69 @@ def gerenciar_assinatura():
         return_url=request.host_url + "dashboard",
     )
     return redirect(session.url, code=303)
+import secrets
 
+@app.route("/newsletter/cadastro", methods=["POST"])
+def newsletter_cadastro():
+    nome = request.form.get("nome", "").strip()
+    email = request.form.get("email", "").strip().lower()
+
+    if not email:
+        flash("E-mail inválido.", "erro")
+        return redirect(url_for("index") + "#newsletter")
+
+    token = secrets.token_urlsafe(32)
+
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("SELECT id, ativo FROM newsletter WHERE email = %s", (email,))
+    existente = cur.fetchone()
+
+    if existente:
+        if existente[1]:
+            flash("Este e-mail já está cadastrado na newsletter.", "info")
+        else:
+            cur.execute("UPDATE newsletter SET ativo = TRUE WHERE email = %s", (email,))
+            conn.commit()
+            flash("Bem-vindo de volta! Você voltou a receber a newsletter.", "sucesso")
+        cur.close()
+        conn.close()
+        return redirect(url_for("index") + "#newsletter")
+
+    cur.execute("""
+        INSERT INTO newsletter (email, nome, token_descadastro)
+        VALUES (%s, %s, %s)
+    """, (email, nome, token))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    corpo = f"""
+    <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
+        <h1 style="color:#0f1f3d">Licita<span style="color:#d4af37">Bot</span></h1>
+        <p>Olá, <strong>{nome}</strong>!</p>
+        <p>Você está cadastrado no <strong>Radar Semanal de Licitações</strong>. Todo monday às 9h você recebe as melhores oportunidades da semana.</p>
+        <p style="color:#6b7280;font-size:0.85rem">
+            Não quer mais receber?
+            <a href="{request.host_url}newsletter/descadastro/{token}" style="color:#d4af37">Clique aqui para se descadastrar.</a>
+        </p>
+    </div>
+    """
+    enviar_email(email, "Você está no Radar Semanal do LicitaBot!", corpo)
+    flash("Cadastrado! Você receberá a newsletter toda segunda.", "sucesso")
+    return redirect(url_for("index") + "#newsletter")
+
+
+@app.route("/newsletter/descadastro/<token>")
+def newsletter_descadastro(token):
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("UPDATE newsletter SET ativo = FALSE WHERE token_descadastro = %s", (token,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    flash("Você foi removido da newsletter.", "info")
+    return redirect(url_for("index"))
+    
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

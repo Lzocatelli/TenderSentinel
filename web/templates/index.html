@@ -181,6 +181,25 @@
         window.location.href = `/assinar/${plano}?periodo=${periodoAtual}`;
     }
 </script>
+<div style="background:#0f1f3d;padding:3rem 2rem;text-align:center">
+    <h2 style="color:white;font-family:Georgia,serif;font-size:1.4rem;margin-bottom:0.5rem">
+        Radar Semanal de Licitações — <span style="color:#d4af37">grátis</span>
+    </h2>
+    <p style="color:rgba(255,255,255,0.6);font-size:0.9rem;margin-bottom:1.5rem">
+        Toda segunda às 9h, as melhores oportunidades da semana no seu e-mail.
+    </p>
+    <form method="POST" action="/newsletter/cadastro" style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="text" name="nome" placeholder="Seu nome" required
+            style="flex:1;min-width:150px;padding:0.75rem 1rem;border-radius:8px;border:none;font-size:0.9rem">
+        <input type="email" name="email" placeholder="Seu e-mail" required
+            style="flex:2;min-width:200px;padding:0.75rem 1rem;border-radius:8px;border:none;font-size:0.9rem">
+        <button type="submit"
+            style="background:#d4af37;color:#0f1f3d;padding:0.75rem 1.5rem;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:0.9rem">
+            Quero receber
+        </button>
+    </form>
+</div>
 
 <footer>
     <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
