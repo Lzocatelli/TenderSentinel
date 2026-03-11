@@ -76,47 +76,111 @@
 
 <div class="section" id="planos">
     <h2 class="section-title">Planos e Preços</h2>
-    <p class="section-subtitle">Escolha o plano ideal para o seu negócio. Cancele quando quiser.</p>
+    <p class="section-subtitle">7 dias grátis em todos os planos. Cancele quando quiser.</p>
+
+    <div style="display:flex;align-items:center;justify-content:center;gap:1rem;margin-bottom:2.5rem">
+        <span id="label-mensal" style="font-weight:600;color:var(--navy);font-size:0.95rem">Mensal</span>
+        <div onclick="togglePeriodo()" style="width:52px;height:28px;background:var(--blue);border-radius:20px;cursor:pointer;position:relative;transition:background 0.2s">
+            <div id="toggle-ball" style="width:22px;height:22px;background:white;border-radius:50%;position:absolute;top:3px;left:3px;transition:left 0.2s"></div>
+        </div>
+        <span id="label-anual" style="font-weight:400;color:var(--gray-500);font-size:0.95rem">
+            Anual <span style="background:var(--gold);color:var(--navy);font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:20px;margin-left:0.25rem">2 meses grátis</span>
+        </span>
+    </div>
 
     <div class="plans-grid">
         <div class="plan-card">
             <p class="plan-name">Básico</p>
-            <p class="plan-price">R$ 99<span>/mês</span></p>
+            <p class="plan-price">
+                <span class="preco-mensal">R$ 49<span style="font-size:1rem;font-weight:400;color:var(--gray-500)">/mês</span></span>
+                <span class="preco-anual" style="display:none">R$ 490<span style="font-size:1rem;font-weight:400;color:var(--gray-500)">/ano</span></span>
+            </p>
+            <p class="preco-detalhe-anual" style="display:none;font-size:0.82rem;color:var(--gray-500);margin-bottom:0.5rem">R$ 41/mês — economia de R$ 98</p>
             <ul class="plan-features">
                 <li>5 palavras-chave monitoradas</li>
                 <li>Alertas diários por e-mail</li>
+                <li>Busca manual quando quiser</li>
                 <li>Acesso ao dashboard</li>
             </ul>
-            <a href="/assinar/basico" class="btn btn-primary btn-block">Assinar agora</a>
+            <a href="#" onclick="assinar('basico')" class="btn btn-primary btn-block">7 dias grátis</a>
         </div>
 
         <div class="plan-card featured">
             <div class="plan-badge">Mais popular</div>
             <p class="plan-name">Profissional</p>
-            <p class="plan-price">R$ 249<span>/mês</span></p>
+            <p class="plan-price">
+                <span class="preco-mensal">R$ 147<span style="font-size:1rem;font-weight:400;color:var(--gray-500)">/mês</span></span>
+                <span class="preco-anual" style="display:none">R$ 1.470<span style="font-size:1rem;font-weight:400;color:var(--gray-500)">/ano</span></span>
+            </p>
+            <p class="preco-detalhe-anual" style="display:none;font-size:0.82rem;color:var(--gray-500);margin-bottom:0.5rem">R$ 122/mês — economia de R$ 294</p>
             <ul class="plan-features">
                 <li>20 palavras-chave monitoradas</li>
                 <li>Alertas por e-mail e WhatsApp</li>
                 <li>Relatório semanal de oportunidades</li>
                 <li>Score de oportunidade</li>
+                <li>Busca manual quando quiser</li>
                 <li>Acesso ao dashboard</li>
             </ul>
-            <a href="/assinar/profissional" class="btn btn-gold btn-block">Assinar agora</a>
+            <a href="#" onclick="assinar('profissional')" class="btn btn-gold btn-block">7 dias grátis</a>
         </div>
 
         <div class="plan-card">
             <p class="plan-name">Agência</p>
-            <p class="plan-price">R$ 499<span>/mês</span></p>
+            <p class="plan-price">
+                <span class="preco-mensal">R$ 297<span style="font-size:1rem;font-weight:400;color:var(--gray-500)">/mês</span></span>
+                <span class="preco-anual" style="display:none">R$ 2.970<span style="font-size:1rem;font-weight:400;color:var(--gray-500)">/ano</span></span>
+            </p>
+            <p class="preco-detalhe-anual" style="display:none;font-size:0.82rem;color:var(--gray-500);margin-bottom:0.5rem">R$ 248/mês — economia de R$ 594</p>
             <ul class="plan-features">
                 <li>Palavras-chave ilimitadas</li>
                 <li>Tudo do plano Profissional</li>
                 <li>Gestão multi-cliente</li>
                 <li>Histórico completo</li>
+                <li>Busca manual quando quiser</li>
             </ul>
-            <a href="/assinar/agencia" class="btn btn-primary btn-block">Assinar agora</a>
+            <a href="#" onclick="assinar('agencia')" class="btn btn-primary btn-block">7 dias grátis</a>
         </div>
     </div>
 </div>
+
+<script>
+    let periodoAtual = 'mensal';
+
+    function togglePeriodo() {
+        periodoAtual = periodoAtual === 'mensal' ? 'anual' : 'mensal';
+        const ball = document.getElementById('toggle-ball');
+        const labelMensal = document.getElementById('label-mensal');
+        const labelAnual = document.getElementById('label-anual');
+
+        if (periodoAtual === 'anual') {
+            ball.style.left = '27px';
+            labelMensal.style.fontWeight = '400';
+            labelMensal.style.color = 'var(--gray-500)';
+            labelAnual.style.fontWeight = '600';
+            labelAnual.style.color = 'var(--navy)';
+        } else {
+            ball.style.left = '3px';
+            labelMensal.style.fontWeight = '600';
+            labelMensal.style.color = 'var(--navy)';
+            labelAnual.style.fontWeight = '400';
+            labelAnual.style.color = 'var(--gray-500)';
+        }
+
+        document.querySelectorAll('.preco-mensal').forEach(el => {
+            el.style.display = periodoAtual === 'mensal' ? '' : 'none';
+        });
+        document.querySelectorAll('.preco-anual').forEach(el => {
+            el.style.display = periodoAtual === 'anual' ? '' : 'none';
+        });
+        document.querySelectorAll('.preco-detalhe-anual').forEach(el => {
+            el.style.display = periodoAtual === 'anual' ? '' : 'none';
+        });
+    }
+
+    function assinar(plano) {
+        window.location.href = `/assinar/${plano}?periodo=${periodoAtual}`;
+    }
+</script>
 
 <footer>
     <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>

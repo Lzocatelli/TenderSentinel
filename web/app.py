@@ -196,15 +196,23 @@ def health():
     except Exception as e:
         return jsonify({"status": "error", "database": str(e)}), 503
 
-@app.route("/assinar/<plano>")
+@@app.route("/assinar/<plano>")
 @login_required
 def assinar(plano):
+    periodo = request.args.get("periodo", "mensal")
+    
     precos = {
         "basico": os.getenv("STRIPE_PRICE_BASICO"),
         "profissional": os.getenv("STRIPE_PRICE_PROFISSIONAL"),
         "agencia": os.getenv("STRIPE_PRICE_AGENCIA"),
+        "basico_anual": os.getenv("STRIPE_PRICE_BASICO_ANUAL"),
+        "profissional_anual": os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL"),
+        "agencia_anual": os.getenv("STRIPE_PRICE_AGENCIA_ANUAL"),
     }
-    price_id = precos.get(plano)
+
+    chave = f"{plano}_anual" if periodo == "anual" else plano
+    price_id = precos.get(chave)
+
     if not price_id:
         flash("Plano inválido.", "erro")
         return redirect(url_for("index"))
@@ -215,10 +223,63 @@ def assinar(plano):
         line_items=[{"price": price_id, "quantity": 1}],
         customer_email=current_user.email,
         metadata={"cliente_id": current_user.id},
+        subscription_data={"trial_period_days": 7},
         success_url=request.host_url + "pagamento/sucesso",
         cancel_url=request.host_url + "pagamento/cancelado",
     )
     return redirect(session.url, code=303)
+
+@app.route("/buscar-agora")
+@login_required
+def buscar_agora():
+    from app.scraper import buscar_licitacoes, salvar_licitacoes, filtrar_por_palavra_chave
+    from app.alertas import enviar_email
+    from app.database import conectar
+
+    try:
+        licitacoes = buscar_licitacoes()
+        salvar_licitacoes(licitacoes)
+
+        novas = filtrar_por_palavra_chave(current_user.palavras_chave)
+
+        conn = conectar()
+        cur = conn.cursor()
+        novas_para_cliente = []
+        for l in novas:
+            cur.execute("""
+                SELECT id FROM alertas_enviados
+                WHERE cliente_id = %s AND licitacao_id = (
+                    SELECT id FROM licitacoes WHERE pncp_id = %s
+                )
+            """, (current_user.id, l[0]))
+            if not cur.fetchone():
+                novas_para_cliente.append(l)
+
+        if novas_para_cliente:
+            from app.alertas import montar_corpo_email
+            corpo = montar_corpo_email(novas_para_cliente)
+            assunto = f"LicitaBot — {len(novas_para_cliente)} nova(s) licitação(ões) encontradas agora"
+            enviado = enviar_email(current_user.email, assunto, corpo)
+            if enviado:
+                for l in novas_para_cliente:
+                    cur.execute("""
+                        INSERT INTO alertas_enviados (cliente_id, licitacao_id)
+                        VALUES (%s, (SELECT id FROM licitacoes WHERE pncp_id = %s))
+                    """, (current_user.id, l[0]))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        if novas_para_cliente:
+            flash(f"{len(novas_para_cliente)} nova(s) licitação(ões) encontradas! Verifique seu e-mail.", "sucesso")
+        else:
+            flash("Nenhuma licitação nova encontrada no momento.", "info")
+
+    except Exception as e:
+        flash(f"Erro ao buscar licitações: {str(e)}", "erro")
+
+    return redirect(url_for("dashboard"))
 
 @app.route("/pagamento/sucesso")
 @login_required
