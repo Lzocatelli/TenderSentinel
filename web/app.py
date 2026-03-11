@@ -450,32 +450,35 @@ def webhook_stripe():
             return "", 200
 
         plano = "basico"
-        for item in stripe.checkout.Session.list_line_items(session_id).data:
-            price_id = item.price.id
-            if price_id in (os.getenv("STRIPE_PRICE_PROFISSIONAL"), os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL")):
-                plano = "profissional"
-            elif price_id in (os.getenv("STRIPE_PRICE_AGENCIA"), os.getenv("STRIPE_PRICE_AGENCIA_ANUAL")):
-                plano = "agencia"
+        try:
+            for item in stripe.checkout.Session.list_line_items(session_id).data:
+                price_id = item.price.id
+                if price_id in (os.getenv("STRIPE_PRICE_PROFISSIONAL"), os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL")):
+                    plano = "profissional"
+                elif price_id in (os.getenv("STRIPE_PRICE_AGENCIA"), os.getenv("STRIPE_PRICE_AGENCIA_ANUAL")):
+                    plano = "agencia"
+        except Exception:
+            pass
 
         cur.execute("""
-    UPDATE clientes
-    SET plano = %s, stripe_customer_id = %s, stripe_subscription_id = %s, stripe_last_session_id = %s
-    WHERE id = %s
-""", (plano, customer_id, subscription_id, session_id, cliente_id))
+            UPDATE clientes
+            SET plano = %s, stripe_customer_id = %s, stripe_subscription_id = %s, stripe_last_session_id = %s
+            WHERE id = %s
+        """, (plano, customer_id, subscription_id, session_id, cliente_id))
 
-# Auto-cadastra cliente na newsletter ao assinar
-cur.execute("SELECT id FROM newsletter WHERE email = (SELECT email FROM clientes WHERE id = %s)", (cliente_id,))
-if not cur.fetchone():
-    token_nl = secrets.token_urlsafe(32)
-    cur.execute("""
-        INSERT INTO newsletter (email, nome, token_descadastro)
-        SELECT email, nome, %s FROM clientes WHERE id = %s
-        ON CONFLICT (email) DO NOTHING
-    """, (token_nl, cliente_id))
+        # Auto-cadastra cliente na newsletter ao assinar
+        cur.execute("SELECT id FROM newsletter WHERE email = (SELECT email FROM clientes WHERE id = %s)", (cliente_id,))
+        if not cur.fetchone():
+            token_nl = secrets.token_urlsafe(32)
+            cur.execute("""
+                INSERT INTO newsletter (email, nome, token_descadastro)
+                SELECT email, nome, %s FROM clientes WHERE id = %s
+                ON CONFLICT (email) DO NOTHING
+            """, (token_nl, cliente_id))
 
-conn.commit()
-cur.close()
-conn.close()
+        conn.commit()
+        cur.close()
+        conn.close()
 
     elif event["type"] == "customer.subscription.deleted":
         subscription_id = event["data"]["object"]["id"]
