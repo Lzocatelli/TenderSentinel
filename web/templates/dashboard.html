@@ -47,7 +47,12 @@
     <h2>Licitações encontradas</h2>
     <div style="display:flex;align-items:center;gap:1rem">
         <span style="font-size:0.82rem;color:var(--gray-500)">Alertas enviados às 9h diariamente</span>
-        <a href="/buscar-agora" class="btn btn-primary" style="padding:0.5rem 1rem;font-size:0.82rem">🔍 Buscar agora</a>
+        <form method="POST" action="/buscar-agora" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem;font-size:0.82rem;border:none;cursor:pointer">
+                🔍 Buscar agora
+            </button>
+        </form>
     </div>
 </div>
 

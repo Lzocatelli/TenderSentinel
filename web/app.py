@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, abort
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.database import conectar
@@ -6,13 +6,32 @@ from app.alertas import enviar_email
 import requests
 import stripe
 import os
+import secrets
+import json
+import time
 from datetime import date
 from dotenv import load_dotenv
 
 load_dotenv(override=False)
 
+secret_key = os.getenv("SECRET_KEY")
+if not secret_key:
+    # Em produção, SECRET_KEY **deve** ser configurado via variável de ambiente.
+    # Geramos uma chave temporária apenas para desenvolvimento/local.
+    secret_key = secrets.token_urlsafe(32)
+    if os.getenv("FLASK_ENV") != "production":
+        print(
+            "WARNING: SECRET_KEY não definido; usando chave temporária apenas para "
+            "desenvolvimento. Defina SECRET_KEY no ambiente em produção."
+        )
+
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "licitabot2026")
+app.secret_key = secret_key
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
+)
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
@@ -26,6 +45,63 @@ def limite_palavras(plano):
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
+
+
+def _get_csrf_token():
+    token = session.get("_csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(16)
+        session["_csrf_token"] = token
+    return token
+
+
+app.jinja_env.globals["csrf_token"] = _get_csrf_token
+
+
+@app.before_request
+def verificar_csrf():
+    # Apenas métodos que modificam estado
+    if request.method not in ("POST", "PUT", "DELETE"):
+        return
+
+    # Endpoints externos ou técnicos podem ser isentos
+    view = request.endpoint or ""
+    csrf_exempt = {
+        "api_contador",
+        "health",
+        "webhook_stripe",
+    }
+    if view in csrf_exempt:
+        return
+
+    token_form = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
+    token_session = session.get("_csrf_token")
+
+    if not token_form or not token_session or token_form != token_session:
+        # #region agent log
+        try:
+            log_entry = {
+                "sessionId": "405a0e",
+                "id": f"log_{int(time.time() * 1000)}_csrf",
+                "timestamp": int(time.time() * 1000),
+                "location": "web/app.py:verificar_csrf",
+                "message": "Falha de CSRF detectada",
+                "data": {
+                    "endpoint": view,
+                    "has_form_token": bool(token_form),
+                    "has_session_token": bool(token_session),
+                },
+                "runId": "pre-fix",
+                "hypothesisId": "H3",
+            }
+            with open(
+                "/home/zocatelli/licitabot/.cursor/debug-405a0e.log", "a"
+            ) as f:
+                f.write(json.dumps(log_entry) + "\n")
+        except Exception:
+            pass
+        # #endregion
+        abort(400)
 
 class Cliente(UserMixin):
     def __init__(self, id, nome, email, palavras_chave, plano=None):
@@ -194,7 +270,29 @@ def health():
         conn.close()
         return jsonify({"status": "ok", "database": "ok"}), 200
     except Exception as e:
-        return jsonify({"status": "error", "database": str(e)}), 503
+        # #region agent log
+        try:
+            log_entry = {
+                "sessionId": "405a0e",
+                "id": f"log_{int(time.time() * 1000)}_health",
+                "timestamp": int(time.time() * 1000),
+                "location": "web/app.py:health",
+                "message": "Falha na verificação de saúde do banco",
+                "data": {
+                    "error_type": type(e).__name__,
+                },
+                "runId": "pre-fix",
+                "hypothesisId": "H2",
+            }
+            with open(
+                "/home/zocatelli/licitabot/.cursor/debug-405a0e.log", "a"
+            ) as f:
+                f.write(json.dumps(log_entry) + "\n")
+        except Exception:
+            # Nunca deixa o log de debug quebrar o endpoint de health
+            pass
+        # #endregion
+        return jsonify({"status": "error", "database": "unavailable"}), 503
 
 @app.route("/assinar/<plano>")
 @login_required
@@ -246,7 +344,7 @@ def assinar(plano):
     )
     return redirect(session.url, code=303)
 
-@app.route("/buscar-agora")
+@app.route("/buscar-agora", methods=["POST"])
 @login_required
 def buscar_agora():
     from app.scraper import buscar_licitacoes, salvar_licitacoes, filtrar_por_palavra_chave
