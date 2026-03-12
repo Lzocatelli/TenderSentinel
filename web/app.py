@@ -212,7 +212,7 @@ def cadastro():
 
     return render_template("cadastro.html")
 
-    @app.template_filter('moeda')
+@app.template_filter('moeda')
 def moeda_filter(valor):
     if not valor:
         return "—"
