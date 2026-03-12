@@ -9,7 +9,7 @@ import os
 import secrets
 import json
 import time
-from datetime import date
+from datetime import date, timedelta 
 from dotenv import load_dotenv
 
 load_dotenv(override=False)
@@ -33,7 +33,7 @@ app.config.update(
     SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
     REMEMBER_COOKIE_DURATION=timedelta(days=30),
 )
-from datetime import timedelta
+
 app.permanent_session_lifetime = timedelta(days=30)
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
