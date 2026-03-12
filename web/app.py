@@ -212,6 +212,15 @@ def cadastro():
 
     return render_template("cadastro.html")
 
+    @app.template_filter('moeda')
+def moeda_filter(valor):
+    if not valor:
+        return "—"
+    try:
+        return f"R$ {float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except:
+        return "—"
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":

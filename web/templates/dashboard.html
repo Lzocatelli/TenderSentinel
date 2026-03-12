@@ -72,7 +72,7 @@
                 <tr>
                     <td class="td-orgao">{{ l[0] or 'N/A' }}</td>
                     <td class="td-objeto">{{ l[1] or 'N/A' }}</td>
-                    <td class="td-valor">{% if l[2] %}R$ {{ "%.2f"|format(l[2]|float) }}{% else %}—{% endif %}</td>
+                    <td class="td-valor">{{ l[2] | moeda }}</td>
                     <td style="color:var(--gray-500)">{{ l[3] or '—' }}</td>
                     <td>{% if l[4] %}<a href="{{ l[4] }}" target="_blank" class="link-ver">Ver</a>{% endif %}</td>
                 </tr>
