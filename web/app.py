@@ -31,7 +31,10 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
+    REMEMBER_COOKIE_DURATION=timedelta(days=30),
 )
+from datetime import timedelta
+app.permanent_session_lifetime = timedelta(days=30)
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
@@ -224,7 +227,7 @@ def login():
 
         if row and check_password_hash(row[4], senha):
             cliente = Cliente(row[0], row[1], row[2], row[3], row[5])
-            login_user(cliente)
+            login_user(cliente, remember=True)
             return redirect(url_for("dashboard"))
 
         flash("E-mail ou senha incorretos.", "erro")
@@ -344,55 +347,86 @@ def assinar(plano):
     )
     return redirect(session.url, code=303)
 
+from threading import Thread
+
 @app.route("/buscar-agora", methods=["POST"])
 @login_required
 def buscar_agora():
-    from app.scraper import buscar_licitacoes, salvar_licitacoes, filtrar_por_palavra_chave
-    from app.alertas import montar_corpo_email
-    from app.database import conectar
+    cliente_id = current_user.id
+    cliente_email = current_user.email
+    cliente_palavras = current_user.palavras_chave
 
-    try:
-        licitacoes = buscar_licitacoes()
-        salvar_licitacoes(licitacoes)
+    def rodar_em_background(cliente_id, cliente_email, cliente_palavras):
+        try:
+            from app.scraper import buscar_licitacoes, salvar_licitacoes
+            from app.alertas import enviar_email
+            from app.database import conectar
 
-        novas = filtrar_por_palavra_chave(current_user.palavras_chave)
+            licitacoes = buscar_licitacoes()
+            salvar_licitacoes(licitacoes)
 
-        conn = conectar()
-        cur = conn.cursor()
-        novas_para_cliente = []
-        for l in novas:
-            cur.execute("""
-                SELECT id FROM alertas_enviados
-                WHERE cliente_id = %s AND licitacao_id = (
-                    SELECT id FROM licitacoes WHERE pncp_id = %s
-                )
-            """, (current_user.id, l[0]))
-            if not cur.fetchone():
-                novas_para_cliente.append(l)
+            conn = conectar()
+            cur = conn.cursor()
 
-        if novas_para_cliente:
-            corpo = montar_corpo_email(novas_para_cliente)
-            assunto = f"LicitaBot — {len(novas_para_cliente)} nova(s) licitação(ões) encontradas agora"
-            enviado = enviar_email(current_user.email, assunto, corpo)
-            if enviado:
-                for l in novas_para_cliente:
+            # Busca licitações que batem com palavras-chave
+            novas = []
+            for palavra in cliente_palavras:
+                cur.execute("""
+                    SELECT l.id, l.pncp_id, l.orgao, l.objeto, l.valor, l.link
+                    FROM licitacoes l
+                    WHERE l.objeto ILIKE %s
+                    AND NOT EXISTS (
+                        SELECT 1 FROM alertas_enviados ae
+                        WHERE ae.cliente_id = %s AND ae.licitacao_id = l.id
+                    )
+                """, (f"%{palavra}%", cliente_id))
+                novas.extend(cur.fetchall())
+
+            # Remove duplicatas
+            vistos = set()
+            novas_unicas = []
+            for l in novas:
+                if l[0] not in vistos:
+                    vistos.add(l[0])
+                    novas_unicas.append(l)
+
+            if novas_unicas:
+                itens_html = ""
+                for l in novas_unicas:
+                    lid, pncp_id, orgao, objeto, valor, link = l
+                    valor_fmt = f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if valor else "Não informado"
+                    itens_html += f"""
+                    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:1rem;margin-bottom:1rem">
+                        <p style="font-weight:600;color:#0f1f3d;margin:0 0 0.5rem">{objeto}</p>
+                        <p style="color:#6b7280;font-size:0.85rem;margin:0 0 0.75rem">{orgao} — {valor_fmt}</p>
+                        <a href="{link}" style="background:#0f1f3d;color:white;padding:0.35rem 0.85rem;border-radius:6px;text-decoration:none;font-size:0.8rem">Ver edital</a>
+                    </div>
+                    """
                     cur.execute("""
                         INSERT INTO alertas_enviados (cliente_id, licitacao_id)
-                        VALUES (%s, (SELECT id FROM licitacoes WHERE pncp_id = %s))
-                    """, (current_user.id, l[0]))
+                        VALUES (%s, %s)
+                        ON CONFLICT DO NOTHING
+                    """, (cliente_id, lid))
 
-        conn.commit()
-        cur.close()
-        conn.close()
+                corpo = f"""
+                <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
+                    <h1 style="color:#0f1f3d">Licita<span style="color:#d4af37">Bot</span></h1>
+                    <p>{len(novas_unicas)} nova(s) licitação(ões) encontradas agora!</p>
+                    {itens_html}
+                </div>
+                """
+                enviar_email(cliente_email, f"LicitaBot — {len(novas_unicas)} nova(s) licitação(ões) encontradas!", corpo)
 
-        if novas_para_cliente:
-            flash(f"{len(novas_para_cliente)} nova(s) licitação(ões) encontradas! Verifique seu e-mail.", "sucesso")
-        else:
-            flash("Nenhuma licitação nova encontrada no momento.", "info")
+            conn.commit()
+            cur.close()
+            conn.close()
 
-    except Exception as e:
-        flash(f"Erro ao buscar licitações: {str(e)}", "erro")
+        except Exception as e:
+            print(f"Erro no buscar_agora background: {e}")
 
+    Thread(target=rodar_em_background, args=(cliente_id, cliente_email, cliente_palavras)).start()
+
+    flash("Busca iniciada! Se encontrarmos algo novo, você receberá um e-mail em instantes.", "info")
     return redirect(url_for("dashboard"))
 
 @app.route("/pagamento/sucesso")
