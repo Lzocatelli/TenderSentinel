@@ -7,17 +7,14 @@ import requests
 import stripe
 import os
 import secrets
-import json
 import time
-from datetime import date, timedelta 
+from datetime import date, timedelta
 from dotenv import load_dotenv
 
 load_dotenv(override=False)
 
 secret_key = os.getenv("SECRET_KEY")
 if not secret_key:
-    # Em produção, SECRET_KEY **deve** ser configurado via variável de ambiente.
-    # Geramos uma chave temporária apenas para desenvolvimento/local.
     secret_key = secrets.token_urlsafe(32)
     if os.getenv("FLASK_ENV") != "production":
         print(
@@ -63,17 +60,11 @@ app.jinja_env.globals["csrf_token"] = _get_csrf_token
 
 @app.before_request
 def verificar_csrf():
-    # Apenas métodos que modificam estado
     if request.method not in ("POST", "PUT", "DELETE"):
         return
 
-    # Endpoints externos ou técnicos podem ser isentos
     view = request.endpoint or ""
-    csrf_exempt = {
-        "api_contador",
-        "health",
-        "webhook_stripe",
-    }
+    csrf_exempt = {"api_contador", "health", "webhook_stripe"}
     if view in csrf_exempt:
         return
 
@@ -81,30 +72,8 @@ def verificar_csrf():
     token_session = session.get("_csrf_token")
 
     if not token_form or not token_session or token_form != token_session:
-        # #region agent log
-        try:
-            log_entry = {
-                "sessionId": "405a0e",
-                "id": f"log_{int(time.time() * 1000)}_csrf",
-                "timestamp": int(time.time() * 1000),
-                "location": "web/app.py:verificar_csrf",
-                "message": "Falha de CSRF detectada",
-                "data": {
-                    "endpoint": view,
-                    "has_form_token": bool(token_form),
-                    "has_session_token": bool(token_session),
-                },
-                "runId": "pre-fix",
-                "hypothesisId": "H3",
-            }
-            with open(
-                "/home/zocatelli/licitabot/.cursor/debug-405a0e.log", "a"
-            ) as f:
-                f.write(json.dumps(log_entry) + "\n")
-        except Exception:
-            pass
-        # #endregion
         abort(400)
+
 
 class Cliente(UserMixin):
     def __init__(self, id, nome, email, palavras_chave, plano=None):
@@ -118,6 +87,7 @@ class Cliente(UserMixin):
     def limite_palavras(self):
         return limite_palavras(self.plano)
 
+
 @login_manager.user_loader
 def load_user(user_id):
     conn = conectar()
@@ -130,20 +100,30 @@ def load_user(user_id):
         return Cliente(row[0], row[1], row[2], row[3], row[4])
     return None
 
+
+# ── Contador com cache e timeout total ───────────────────────────────────────
 _cache_contador = {"total": 0, "atualizado_em": None}
 
 def contar_licitacoes_hoje():
-    from datetime import datetime, timedelta
+    from datetime import datetime
     agora = datetime.utcnow()
+
+    # Retorna cache se ainda válido (5 min)
     if _cache_contador["atualizado_em"] and agora - _cache_contador["atualizado_em"] < timedelta(minutes=5):
         return _cache_contador["total"]
 
     hoje = date.today().strftime("%Y%m%d")
     url = "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao"
     total = 0
+    deadline = time.time() + 8  # FIX: timeout total de 8s para não travar o worker
+
     for modalidade in [4, 5, 6, 7]:
+        if time.time() > deadline:
+            break
         pagina = 1
         while True:
+            if time.time() > deadline:
+                break
             try:
                 r = requests.get(url, params={
                     "dataInicial": hoje,
@@ -151,7 +131,7 @@ def contar_licitacoes_hoje():
                     "pagina": pagina,
                     "tamanhoPagina": 50,
                     "codigoModalidadeContratacao": modalidade
-                }, timeout=5)
+                }, timeout=4)  # FIX: timeout por request reduzido para 4s
                 if r.status_code == 200:
                     dados = r.json().get("data", [])
                     total += len(dados)
@@ -160,16 +140,18 @@ def contar_licitacoes_hoje():
                     pagina += 1
                 else:
                     break
-            except:
+            except Exception:
                 break
 
     _cache_contador["total"] = total
     _cache_contador["atualizado_em"] = agora
     return total
 
+
 @app.route("/")
 def index():
     return render_template("index.html", total_hoje=0)
+
 
 @app.route("/cadastro", methods=["GET", "POST"])
 def cadastro():
@@ -190,6 +172,8 @@ def cadastro():
         cur.execute("SELECT id FROM clientes WHERE email = %s", (email,))
         if cur.fetchone():
             flash("E-mail já cadastrado.", "erro")
+            cur.close()
+            conn.close()
             return render_template("cadastro.html")
 
         senha_hash = generate_password_hash(senha)
@@ -212,14 +196,16 @@ def cadastro():
 
     return render_template("cadastro.html")
 
+
 @app.template_filter('moeda')
 def moeda_filter(valor):
     if not valor:
         return "—"
     try:
         return f"R$ {float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    except:
+    except Exception:
         return "—"
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -243,11 +229,13 @@ def login():
 
     return render_template("login.html")
 
+
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
     return redirect(url_for("index"))
+
 
 @app.route("/dashboard")
 @login_required
@@ -267,10 +255,12 @@ def dashboard():
     conn.close()
     return render_template("dashboard.html", licitacoes=licitacoes, cliente=current_user)
 
+
 @app.route("/api/contador")
 def api_contador():
     total = contar_licitacoes_hoje()
     return jsonify({"total": total})
+
 
 @app.route("/health")
 def health():
@@ -281,35 +271,13 @@ def health():
         cur.close()
         conn.close()
         return jsonify({"status": "ok", "database": "ok"}), 200
-    except Exception as e:
-        # #region agent log
-        try:
-            log_entry = {
-                "sessionId": "405a0e",
-                "id": f"log_{int(time.time() * 1000)}_health",
-                "timestamp": int(time.time() * 1000),
-                "location": "web/app.py:health",
-                "message": "Falha na verificação de saúde do banco",
-                "data": {
-                    "error_type": type(e).__name__,
-                },
-                "runId": "pre-fix",
-                "hypothesisId": "H2",
-            }
-            with open(
-                "/home/zocatelli/licitabot/.cursor/debug-405a0e.log", "a"
-            ) as f:
-                f.write(json.dumps(log_entry) + "\n")
-        except Exception:
-            # Nunca deixa o log de debug quebrar o endpoint de health
-            pass
-        # #endregion
+    except Exception:
         return jsonify({"status": "error", "database": "unavailable"}), 503
+
 
 @app.route("/assinar/<plano>")
 @login_required
 def assinar(plano):
-    # CORREÇÃO 2: bloqueia se já tem assinatura ativa
     if current_user.plano in ('basico', 'profissional', 'agencia'):
         flash("Você já possui uma assinatura ativa. Para trocar de plano, cancele o atual primeiro.", "info")
         return redirect(url_for("dashboard"))
@@ -317,12 +285,12 @@ def assinar(plano):
     periodo = request.args.get("periodo", "mensal")
 
     precos = {
-        "basico": os.getenv("STRIPE_PRICE_BASICO"),
-        "profissional": os.getenv("STRIPE_PRICE_PROFISSIONAL"),
-        "agencia": os.getenv("STRIPE_PRICE_AGENCIA"),
-        "basico_anual": os.getenv("STRIPE_PRICE_BASICO_ANUAL"),
-        "profissional_anual": os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL"),
-        "agencia_anual": os.getenv("STRIPE_PRICE_AGENCIA_ANUAL"),
+        "basico":               os.getenv("STRIPE_PRICE_BASICO"),
+        "profissional":         os.getenv("STRIPE_PRICE_PROFISSIONAL"),
+        "agencia":              os.getenv("STRIPE_PRICE_AGENCIA"),
+        "basico_anual":         os.getenv("STRIPE_PRICE_BASICO_ANUAL"),
+        "profissional_anual":   os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL"),
+        "agencia_anual":        os.getenv("STRIPE_PRICE_AGENCIA_ANUAL"),
     }
 
     chave = f"{plano}_anual" if periodo == "anual" else plano
@@ -332,7 +300,6 @@ def assinar(plano):
         flash("Plano inválido.", "erro")
         return redirect(url_for("index"))
 
-    # CORREÇÃO 1: reutiliza customer_id existente para evitar duplicatas
     customer_id = None
     conn = conectar()
     cur = conn.cursor()
@@ -343,7 +310,7 @@ def assinar(plano):
     if row and row[0]:
         customer_id = row[0]
 
-    session = stripe.checkout.Session.create(
+    checkout_session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         mode="subscription",
         line_items=[{"price": price_id, "quantity": 1}],
@@ -354,7 +321,8 @@ def assinar(plano):
         success_url=request.host_url + "pagamento/sucesso",
         cancel_url=request.host_url + "pagamento/cancelado",
     )
-    return redirect(session.url, code=303)
+    return redirect(checkout_session.url, code=303)
+
 
 from threading import Thread
 
@@ -377,7 +345,6 @@ def buscar_agora():
             conn = conectar()
             cur = conn.cursor()
 
-            # Busca licitações que batem com palavras-chave
             novas = []
             for palavra in cliente_palavras:
                 cur.execute("""
@@ -391,7 +358,6 @@ def buscar_agora():
                 """, (f"%{palavra}%", cliente_id))
                 novas.extend(cur.fetchall())
 
-            # Remove duplicatas
             vistos = set()
             novas_unicas = []
             for l in novas:
@@ -438,16 +404,19 @@ def buscar_agora():
     flash("Busca iniciada! Se encontrarmos algo novo, você receberá um e-mail em instantes.", "info")
     return redirect(url_for("dashboard"))
 
+
 @app.route("/pagamento/sucesso")
 @login_required
 def pagamento_sucesso():
     return render_template("pagamento_sucesso.html")
+
 
 @app.route("/pagamento/cancelado")
 @login_required
 def pagamento_cancelado():
     flash("Pagamento cancelado. Nenhuma cobrança foi feita.", "info")
     return redirect(url_for("index"))
+
 
 @app.route("/webhook/stripe", methods=["POST"])
 def webhook_stripe():
@@ -461,18 +430,16 @@ def webhook_stripe():
         return "", 400
 
     if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        session_id = session["id"]
+        sess = event["data"]["object"]
+        session_id = sess["id"]
 
-        # CORREÇÃO 4: valida cliente_id do metadata
-        cliente_id = session["metadata"].get("cliente_id")
+        cliente_id = sess["metadata"].get("cliente_id")
         if not cliente_id:
             return "", 200
 
-        subscription_id = session.get("subscription")
-        customer_id = session.get("customer")
+        subscription_id = sess.get("subscription")
+        customer_id = sess.get("customer")
 
-        # CORREÇÃO 3: idempotência — ignora se já processou este session_id
         conn = conectar()
         cur = conn.cursor()
         cur.execute("SELECT stripe_last_session_id FROM clientes WHERE id = %s", (cliente_id,))
@@ -482,7 +449,6 @@ def webhook_stripe():
             conn.close()
             return "", 200
 
-        # CORREÇÃO 4: valida que customer_id bate com o cliente
         cur.execute("""
             SELECT id FROM clientes
             WHERE id = %s AND (stripe_customer_id = %s OR stripe_customer_id IS NULL)
@@ -509,7 +475,6 @@ def webhook_stripe():
             WHERE id = %s
         """, (plano, customer_id, subscription_id, session_id, cliente_id))
 
-        # Auto-cadastra cliente na newsletter ao assinar
         cur.execute("SELECT id FROM newsletter WHERE email = (SELECT email FROM clientes WHERE id = %s)", (cliente_id,))
         if not cur.fetchone():
             token_nl = secrets.token_urlsafe(32)
@@ -527,12 +492,13 @@ def webhook_stripe():
         subscription_id = event["data"]["object"]["id"]
         conn = conectar()
         cur = conn.cursor()
-        cur.execute("UPDATE clientes SET plano = NULL WHERE stripe_subscription_id = %s", (subscription_id,))
+        cur.execute("UPDATE clientes SET plano = NULL, stripe_customer_id = NULL, stripe_subscription_id = NULL WHERE stripe_subscription_id = %s", (subscription_id,))
         conn.commit()
         cur.close()
         conn.close()
 
     return "", 200
+
 
 @app.route("/editar-palavras", methods=["GET", "POST"])
 @login_required
@@ -558,6 +524,7 @@ def editar_palavras():
 
     return render_template("editar_palavras.html", cliente=current_user)
 
+
 @app.route("/gerenciar-assinatura")
 @login_required
 def gerenciar_assinatura():
@@ -572,12 +539,27 @@ def gerenciar_assinatura():
         flash("Nenhuma assinatura encontrada.", "info")
         return redirect(url_for("dashboard"))
 
-    session = stripe.billing_portal.Session.create(
-        customer=row[0],
-        return_url=request.host_url + "dashboard",
-    )
-    return redirect(session.url, code=303)
-import secrets
+    try:
+        portal_session = stripe.billing_portal.Session.create(
+            customer=row[0],
+            return_url=request.host_url + "dashboard",
+        )
+        return redirect(portal_session.url, code=303)
+    except stripe.error.InvalidRequestError:
+        # FIX: customer não existe mais no Stripe — limpa o banco e redireciona
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE clientes
+            SET stripe_customer_id = NULL, stripe_subscription_id = NULL, plano = NULL
+            WHERE id = %s
+        """, (current_user.id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash("Assinatura não encontrada. Seu plano foi resetado — assine novamente.", "info")
+        return redirect(url_for("index"))
+
 
 @app.route("/newsletter/cadastro", methods=["POST"])
 def newsletter_cadastro():
@@ -618,7 +600,7 @@ def newsletter_cadastro():
     <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
         <h1 style="color:#0f1f3d">Licita<span style="color:#d4af37">Bot</span></h1>
         <p>Olá, <strong>{nome}</strong>!</p>
-        <p>Você está cadastrado no <strong>Radar Semanal de Licitações</strong>. Todo monday às 9h você recebe as melhores oportunidades da semana.</p>
+        <p>Você está cadastrado no <strong>Radar Semanal de Licitações</strong>. Toda segunda às 9h você recebe as melhores oportunidades da semana.</p>
         <p style="color:#6b7280;font-size:0.85rem">
             Não quer mais receber?
             <a href="{request.host_url}newsletter/descadastro/{token}" style="color:#d4af37">Clique aqui para se descadastrar.</a>
@@ -640,6 +622,7 @@ def newsletter_descadastro(token):
     conn.close()
     flash("Você foi removido da newsletter.", "info")
     return redirect(url_for("index"))
-    
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
