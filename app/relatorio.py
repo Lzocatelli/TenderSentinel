@@ -1,10 +1,13 @@
 import html
+import os
 from datetime import datetime, timedelta
 
 from app.database import conectar
 from app.alertas import enviar_email
 from app.score import calcular_score
 
+
+BASE_URL = os.getenv("BASE_URL", "https://web-production-54881.up.railway.app")
 
 def _formatar_valor(valor):
     if valor is None:
@@ -93,7 +96,7 @@ def _montar_email_relatorio(nome_cliente, licitacoes, top5, total_valor):
                 {cards_html or '<p style="font-size:13px;color:#cbd5f5;">Nenhuma licitação relevante encontrada nos últimos 7 dias.</p>'}
 
                 <div style="text-align:center;margin-top:18px;">
-                    <a href="https://licitabot.com/dashboard" style="display:inline-block;background:#d4af37;color:#0f1f3d;text-decoration:none;font-size:13px;font-weight:600;padding:10px 22px;border-radius:999px;">
+                    <a href="{BASE_URL}/dashboard" style="display:inline-block;background:#d4af37;color:#0f1f3d;text-decoration:none;font-size:13px;font-weight:600;padding:10px 22px;border-radius:999px;">
                         Acessar meu dashboard
                     </a>
                 </div>
