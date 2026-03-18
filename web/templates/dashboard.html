@@ -5,9 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard — LicitaBot</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .score-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .score-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+        .score-alta  { background: #dcfce7; color: #15803d; }
+        .score-media { background: #fef3c7; color: #b45309; }
+        .score-baixa { background: #f1f5f9; color: #64748b; }
+    </style>
 </head>
 <body>
-
+ 
 <nav>
     <a href="/" class="nav-logo">Licita<span>Bot</span></a>
     <div class="nav-links">
@@ -15,7 +35,7 @@
         <a href="/logout">Sair</a>
     </div>
 </nav>
-
+ 
 <div class="dashboard">
     <div class="dashboard-header">
         <h1 class="dashboard-title">Olá, <span>{{ cliente.nome.split()[0] }}</span>!</h1>
@@ -25,41 +45,44 @@
             — <a href="/gerenciar-assinatura" style="color:var(--blue)">Gerenciar assinatura</a>
         </p>
     </div>
-{% if not cliente.plano or cliente.plano == 'gratuito' %}
-<div style="background:linear-gradient(135deg,var(--navy) 0%,var(--navy-light) 100%);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
-    <div>
-        <p style="color:var(--gold);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem">Você está no plano gratuito</p>
-        <p style="color:rgba(255,255,255,0.75);font-size:0.85rem">Monitore até 2 palavras-chave. Assine um plano para monitorar mais e receber alertas avançados.</p>
+ 
+    {% if not cliente.plano or cliente.plano == 'gratuito' %}
+    <div style="background:linear-gradient(135deg,var(--navy) 0%,var(--navy-light) 100%);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+        <div>
+            <p style="color:var(--gold);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem">Você está no plano gratuito</p>
+            <p style="color:rgba(255,255,255,0.75);font-size:0.85rem">Monitore até 2 palavras-chave. Assine um plano para monitorar mais e receber alertas avançados.</p>
+        </div>
+        <a href="/#planos" class="btn btn-gold" style="white-space:nowrap;padding:0.6rem 1.5rem;font-size:0.875rem">Ver planos</a>
     </div>
-    <a href="/#planos" class="btn btn-gold" style="white-space:nowrap;padding:0.6rem 1.5rem;font-size:0.875rem">Ver planos</a>
-</div>
-{% endif %}
+    {% endif %}
+ 
     <div class="keywords-bar">
-    <span class="keywords-label">Monitorando</span>
-    {% for palavra in cliente.palavras_chave %}
-        <span class="keyword-tag">{{ palavra }}</span>
-    {% endfor %}
-    <a href="/editar-palavras" style="margin-left:auto;font-size:0.82rem;color:var(--blue);text-decoration:none;font-weight:500">Editar</a>
-</div>
-
+        <span class="keywords-label">Monitorando</span>
+        {% for palavra in cliente.palavras_chave %}
+            <span class="keyword-tag">{{ palavra }}</span>
+        {% endfor %}
+        <a href="/editar-palavras" style="margin-left:auto;font-size:0.82rem;color:var(--blue);text-decoration:none;font-weight:500">Editar</a>
+    </div>
+ 
     <div class="table-container">
         <div class="table-header">
-    <h2>Licitações encontradas</h2>
-    <div style="display:flex;align-items:center;gap:1rem">
-        <span style="font-size:0.82rem;color:var(--gray-500)">Alertas enviados às 9h diariamente</span>
-        <form method="POST" action="/buscar-agora" style="display:inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem;font-size:0.82rem;border:none;cursor:pointer">
-                🔍 Buscar agora
-            </button>
-        </form>
-    </div>
-</div>
-
+            <h2>Licitações encontradas</h2>
+            <div style="display:flex;align-items:center;gap:1rem">
+                <span style="font-size:0.82rem;color:var(--gray-500)">Alertas enviados às 9h diariamente</span>
+                <form method="POST" action="/buscar-agora" style="display:inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem;font-size:0.82rem;border:none;cursor:pointer">
+                        🔍 Buscar agora
+                    </button>
+                </form>
+            </div>
+        </div>
+ 
         {% if licitacoes %}
         <table>
             <thead>
                 <tr>
+                    <th>Score</th>
                     <th>Órgão</th>
                     <th>Objeto</th>
                     <th>Valor estimado</th>
@@ -70,6 +93,25 @@
             <tbody>
                 {% for l in licitacoes %}
                 <tr>
+                    <td>
+                        {% set score = l[5] if l|length > 5 else 0 %}
+                        {% if score >= 8 %}
+                            <span class="score-badge score-alta">
+                                <span class="score-dot" style="background:#16a34a"></span>
+                                {{ score }} Alta
+                            </span>
+                        {% elif score >= 5 %}
+                            <span class="score-badge score-media">
+                                <span class="score-dot" style="background:#d97706"></span>
+                                {{ score }} Média
+                            </span>
+                        {% else %}
+                            <span class="score-badge score-baixa">
+                                <span class="score-dot" style="background:#94a3b8"></span>
+                                {{ score }} Baixa
+                            </span>
+                        {% endif %}
+                    </td>
                     <td class="td-orgao">{{ l[0] or 'N/A' }}</td>
                     <td class="td-objeto">{{ l[1] or 'N/A' }}</td>
                     <td class="td-valor">{{ l[2] | moeda }}</td>
@@ -87,10 +129,10 @@
         {% endif %}
     </div>
 </div>
-
+ 
 <footer>
     <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
 </footer>
-
+ 
 </body>
 </html>

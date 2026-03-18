@@ -240,6 +240,8 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
+    from app.score import calcular_score
+ 
     conn = conectar()
     cur = conn.cursor()
     cur.execute("""
@@ -250,9 +252,20 @@ def dashboard():
         ORDER BY ae.enviado_em DESC
         LIMIT 50
     """, (current_user.id,))
-    licitacoes = cur.fetchall()
+    rows = cur.fetchall()
     cur.close()
     conn.close()
+ 
+    # Calcula score para cada licitação e adiciona como 6º elemento
+    licitacoes = []
+    for row in rows:
+        orgao, objeto, valor, data, link = row
+        score = calcular_score(objeto, current_user.palavras_chave, valor)
+        licitacoes.append((orgao, objeto, valor, data, link, score))
+ 
+    # Ordena por score decrescente
+    licitacoes.sort(key=lambda x: x[5], reverse=True)
+ 
     return render_template("dashboard.html", licitacoes=licitacoes, cliente=current_user)
 
 
