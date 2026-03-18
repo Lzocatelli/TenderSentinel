@@ -138,8 +138,13 @@
 <nav>
     <a href="/" class="nav-logo">Licita<span>Bot</span></a>
     <div class="nav-links">
+    {% if current_user.is_authenticated %}
+        <a href="/dashboard">Dashboard</a>
+        <a href="/logout">Sair</a>
+    {% else %}
         <a href="/login">Entrar</a>
         <a href="/cadastro" class="btn btn-primary" style="padding:0.5rem 1.25rem">Começar grátis</a>
+    {% endif %}
     </div>
 </nav>
 
@@ -389,7 +394,11 @@
     }
 
     function assinar(plano) {
+    {% if current_user.is_authenticated %}
         window.location.href = `/assinar/${plano}?periodo=${periodoAtual}`;
+    {% else %}
+        window.location.href = `/cadastro?plano=${plano}&periodo=${periodoAtual}`;
+    {% endif %}
     }
 </script>
 
