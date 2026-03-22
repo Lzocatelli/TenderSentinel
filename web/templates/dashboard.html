@@ -27,22 +27,16 @@
     </style>
 </head>
 <body>
- 
+
 <nav>
     <a href="/" class="nav-logo">Licita<span>Bot</span></a>
     <div class="nav-links">
         <span style="color:rgba(255,255,255,0.6);font-size:0.9rem">{{ cliente.nome }}</span>
+        <a href="/minha-conta">Minha conta</a>
         <a href="/logout">Sair</a>
-        <button class="dark-toggle" onclick="toggleDark()" title="Alternar modo escuro" style="background:none;border:none;cursor:pointer;">
-    <div class="dark-toggle-track">
-        <div class="dark-toggle-thumb" id="dark-thumb">
-            <span class="dark-toggle-icon" id="dark-icon">☀️</span>
-        </div>
-    </div>
-</button>
     </div>
 </nav>
- 
+
 <div class="dashboard">
     <div class="dashboard-header">
         <h1 class="dashboard-title">Olá, <span>{{ cliente.nome.split()[0] }}</span>!</h1>
@@ -52,17 +46,17 @@
             — <a href="/gerenciar-assinatura" style="color:var(--blue)">Gerenciar assinatura</a>
         </p>
     </div>
- 
-    {% if not cliente.plano or cliente.plano == 'gratuito' %}
+
+    {% if not cliente.plano_pago %}
     <div style="background:linear-gradient(135deg,var(--navy) 0%,var(--navy-light) 100%);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
         <div>
             <p style="color:var(--gold);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem">Você está no plano gratuito</p>
-            <p style="color:rgba(255,255,255,0.75);font-size:0.85rem">Monitore até 2 palavras-chave. Assine um plano para monitorar mais e receber alertas avançados.</p>
+            <p style="color:rgba(255,255,255,0.75);font-size:0.85rem">Monitore até 1 palavra-chave. Assine um plano para monitorar mais, usar busca manual e acessar filtros avançados.</p>
         </div>
         <a href="/#planos" class="btn btn-gold" style="white-space:nowrap;padding:0.6rem 1.5rem;font-size:0.875rem">Ver planos</a>
     </div>
     {% endif %}
- 
+
     <div class="keywords-bar">
         <span class="keywords-label">Monitorando</span>
         {% for palavra in cliente.palavras_chave %}
@@ -70,26 +64,63 @@
         {% endfor %}
         <a href="/editar-palavras" style="margin-left:auto;font-size:0.82rem;color:var(--blue);text-decoration:none;font-weight:500">Editar</a>
     </div>
- 
+
+    {% if cliente.plano_pago %}
+    <form method="GET" action="/dashboard" class="dashboard-filters">
+        <div class="filter-group">
+            <label for="valor_min">Valor mínimo (R$)</label>
+            <input type="number" id="valor_min" name="valor_min" min="0" step="1000"
+                   value="{{ valor_min }}" placeholder="Ex: 50000">
+        </div>
+        <div class="filter-group">
+            <label for="uf">Estado (UF)</label>
+            <select id="uf" name="uf">
+                <option value="">Todos</option>
+                {% for sigla in ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'] %}
+                <option value="{{ sigla }}" {% if uf_selecionada == sigla %}selected{% endif %}>{{ sigla }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary" style="align-self:flex-end;padding:0.55rem 1.25rem;font-size:0.85rem;border:none;cursor:pointer">Filtrar</button>
+        {% if valor_min or uf_selecionada %}
+        <a href="/dashboard" class="btn btn-secondary" style="align-self:flex-end;padding:0.55rem 1.25rem;font-size:0.85rem">Limpar</a>
+        {% endif %}
+    </form>
+    {% endif %}
+
     <div class="table-container">
         <div class="table-header">
             <h2>Licitações encontradas</h2>
-            <div style="display:flex;align-items:center;gap:1rem">
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
                 <span style="font-size:0.82rem;color:var(--gray-500)">Alertas enviados às 9h diariamente</span>
+                {% if cliente.plano_pago %}
                 <form method="POST" action="/buscar-agora" style="display:inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem;font-size:0.82rem;border:none;cursor:pointer">
-                        🔍 Buscar agora
+                        Buscar agora
                     </button>
                 </form>
+                {% endif %}
+                {% if cliente.plano in ('profissional', 'agencia') %}
+                <a href="/export-csv{% if valor_min or uf_selecionada %}?valor_min={{ valor_min }}&uf={{ uf_selecionada }}{% endif %}"
+                   class="btn btn-secondary" style="padding:0.5rem 1rem;font-size:0.82rem">
+                    Exportar CSV
+                </a>
+                {% endif %}
             </div>
         </div>
- 
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}" style="margin:1rem 0">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
         {% if licitacoes %}
         <table>
             <thead>
                 <tr>
-                    <th>Score</th>
+                    {% if show_score %}<th>Score</th>{% endif %}
                     <th>Órgão</th>
                     <th>Objeto</th>
                     <th>Valor estimado</th>
@@ -100,8 +131,9 @@
             <tbody>
                 {% for l in licitacoes %}
                 <tr>
+                    {% if show_score %}
                     <td>
-                        {% set score = l[5] if l|length > 5 else 0 %}
+                        {% set score = l[5] %}
                         {% if score >= 8 %}
                             <span class="score-badge score-alta">
                                 <span class="score-dot" style="background:#16a34a"></span>
@@ -119,6 +151,7 @@
                             </span>
                         {% endif %}
                     </td>
+                    {% endif %}
                     <td class="td-orgao">{{ l[0] or 'N/A' }}</td>
                     <td class="td-objeto">{{ l[1] or 'N/A' }}</td>
                     <td class="td-valor">{{ l[2] | moeda }}</td>
@@ -136,27 +169,10 @@
         {% endif %}
     </div>
 </div>
- 
+
 <footer>
     <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
 </footer>
-<script>
-    function applyTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        const icon = document.getElementById('dark-icon');
-        if (icon) icon.textContent = theme === 'dark' ? '🌙' : '☀️';
-        localStorage.setItem('theme', theme);
-    }
-    function toggleDark() {
-        const current = document.documentElement.getAttribute('data-theme');
-        applyTheme(current === 'dark' ? 'light' : 'dark');
-    }
-    (function() {
-        const saved = localStorage.getItem('theme') ||
-            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        applyTheme(saved);
-    })();
-</script>
- 
+
 </body>
 </html>

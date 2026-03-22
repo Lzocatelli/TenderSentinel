@@ -53,6 +53,7 @@ def criar_tabelas():
             valor NUMERIC,
             data_publicacao DATE,
             link TEXT,
+            uf TEXT,
             criado_em TIMESTAMP DEFAULT NOW()
         );
     """)
@@ -68,17 +69,22 @@ def criar_tabelas():
             plano TEXT,
             stripe_customer_id TEXT,
             stripe_subscription_id TEXT,
+            stripe_last_session_id TEXT,
             criado_em TIMESTAMP DEFAULT NOW()
         );
     """)
 
-    for col, tipo in [
-        ("plano", "TEXT"),
-        ("stripe_customer_id", "TEXT"),
-        ("stripe_subscription_id", "TEXT"),
-    ]:
+    # Migrations incrementais: colunas adicionadas em versões posteriores
+    migrations = [
+        ("licitacoes", "uf", "TEXT"),
+        ("clientes", "plano", "TEXT"),
+        ("clientes", "stripe_customer_id", "TEXT"),
+        ("clientes", "stripe_subscription_id", "TEXT"),
+        ("clientes", "stripe_last_session_id", "TEXT"),
+    ]
+    for tabela, col, tipo in migrations:
         try:
-            cur.execute(f"ALTER TABLE clientes ADD COLUMN IF NOT EXISTS {col} {tipo};")
+            cur.execute(f"ALTER TABLE {tabela} ADD COLUMN IF NOT EXISTS {col} {tipo};")
         except Exception:
             pass
 
@@ -87,7 +93,19 @@ def criar_tabelas():
             id SERIAL PRIMARY KEY,
             cliente_id INT REFERENCES clientes(id),
             licitacao_id INT REFERENCES licitacoes(id),
-            enviado_em TIMESTAMP DEFAULT NOW()
+            enviado_em TIMESTAMP DEFAULT NOW(),
+            UNIQUE (cliente_id, licitacao_id)
+        );
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS newsletter (
+            id SERIAL PRIMARY KEY,
+            email TEXT UNIQUE,
+            nome TEXT,
+            token_descadastro TEXT,
+            ativo BOOLEAN DEFAULT TRUE,
+            criado_em TIMESTAMP DEFAULT NOW()
         );
     """)
 

@@ -62,8 +62,8 @@ def salvar_licitacoes(licitacoes):
     for item in licitacoes:
         try:
             cur.execute("""
-                INSERT INTO licitacoes (pncp_id, orgao, objeto, valor, data_publicacao, link)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO licitacoes (pncp_id, orgao, objeto, valor, data_publicacao, link, uf)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (pncp_id) DO NOTHING
             """, (
                 item.get("numeroControlePNCP"),
@@ -71,7 +71,8 @@ def salvar_licitacoes(licitacoes):
                 item.get("objetoCompra"),
                 item.get("valorTotalEstimado"),
                 item.get("dataPublicacaoPncp", "")[:10] if item.get("dataPublicacaoPncp") else None,
-                item.get("linkSistemaOrigem")
+                item.get("linkSistemaOrigem"),
+                item.get("unidadeOrgao", {}).get("ufSigla"),
             ))
             if cur.rowcount > 0:
                 salvas += 1

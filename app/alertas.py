@@ -6,6 +6,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 from app.database import conectar
+from app.utils import limite_palavras, formatar_moeda
 
 load_dotenv()
 
@@ -22,50 +23,34 @@ def enviar_email(destinatario, assunto, corpo):
     sendgrid_from = os.getenv("SENDGRID_FROM_EMAIL")
 
     if sendgrid_key and sendgrid_from:
-        headers = {
-            "Authorization": f"Bearer {sendgrid_key}",
-            "Content-Type": "application/json",
-        }
-        data = {
-            "personalizations": [{"to": [{"email": destinatario}]}],
-            "from": {"email": sendgrid_from},
-            "subject": assunto,
-            "content": [{"type": "text/html", "value": corpo}],
-        }
-
         try:
             resp = requests.post(
                 "https://api.sendgrid.com/v3/mail/send",
-                headers=headers,
-                json=data,
+                headers={"Authorization": f"Bearer {sendgrid_key}", "Content-Type": "application/json"},
+                json={
+                    "personalizations": [{"to": [{"email": destinatario}]}],
+                    "from": {"email": sendgrid_from},
+                    "subject": assunto,
+                    "content": [{"type": "text/html", "value": corpo}],
+                },
                 timeout=10,
             )
             if resp.status_code in (200, 202):
                 print(f"E-mail enviado para {destinatario} via SendGrid")
                 return True
-            print(
-                f"Falha ao enviar e-mail via SendGrid: "
-                f"{resp.status_code} - {resp.text}"
-            )
+            print(f"Falha SendGrid: {resp.status_code} — {resp.text}")
             return False
         except Exception as e:
-            print(f"Erro ao enviar e-mail via SendGrid: {e}")
+            print(f"Erro SendGrid: {e}")
             return False
 
     remetente = os.getenv("EMAIL_REMETENTE")
     senha = os.getenv("EMAIL_SENHA")
 
     if not remetente or not senha:
-        missing = []
-        if not remetente:
-            missing.append("EMAIL_REMETENTE")
-        if not senha:
-            missing.append("EMAIL_SENHA")
+        missing = [v for v in ("EMAIL_REMETENTE", "EMAIL_SENHA") if not os.getenv(v)]
         raise RuntimeError(
-            "Configuração de e-mail incompleta. "
-            f"Defina as variáveis: {', '.join(missing)} "
-            "no .env (ambiente local) ou na configuração da Railway. "
-            "Para Gmail, prefira utilizar uma App Password."
+            f"Configuração de e-mail incompleta. Defina: {', '.join(missing)}"
         )
 
     msg = MIMEMultipart()
@@ -81,62 +66,23 @@ def enviar_email(destinatario, assunto, corpo):
         print(f"E-mail enviado para {destinatario} via SMTP")
         return True
     except Exception as e:
-        print(f"Erro ao enviar e-mail via SMTP: {e}")
+        print(f"Erro SMTP: {e}")
         return False
 
-def montar_corpo_email(licitacoes):
-    if not licitacoes:
-        return ""
 
-    itens = ""
-    for l in licitacoes:
-        valor = f"R$ {l[3]:,.2f}" if l[3] else "Não informado"
-        link = f'<a href="{l[5]}">Ver licitação</a>' if l[5] else "Link não disponível"
-        
-        # Trata o texto nulo e limita o tamanho a 250 caracteres para não quebrar o layout
-        orgao_texto = str(l[1]) if l[1] else 'N/A'
-        objeto_texto = str(l[2]) if l[2] else 'N/A'
-        
-        if len(objeto_texto) > 250:
-            objeto_texto = objeto_texto[:247] + "..."
-
-        # Transforma caracteres perigosos (<, >, &) em texto inofensivo para o HTML
-        orgao_seguro = html.escape(orgao_texto)
-        objeto_seguro = html.escape(objeto_texto)
-
-        itens += f"""
-        <tr>
-            <td style="padding:8px;border-bottom:1px solid #eee">{orgao_seguro}</td>
-            <td style="padding:8px;border-bottom:1px solid #eee">{objeto_seguro}</td>
-            <td style="padding:8px;border-bottom:1px solid #eee">{valor}</td>
-            <td style="padding:8px;border-bottom:1px solid #eee">{link}</td>
-        </tr>
-        """
-
+def _montar_card_licitacao(orgao, objeto, valor, link):
+    orgao_s = html.escape(str(orgao or "N/A"))
+    objeto_s = html.escape(str(objeto or "N/A")[:280])
+    valor_s = formatar_moeda(valor)
+    link_s = html.escape(str(link or "#"))
     return f"""
-    <html>
-    <body style="font-family:Arial,sans-serif;color:#333">
-        <div style="max-width:800px;margin:auto;padding:20px">
-            <h2 style="color:#1B3A6B">🔔 LicitaBot — Novas Oportunidades</h2>
-            <p>Encontramos <strong>{len(licitacoes)} licitação(ões)</strong> relevantes para você hoje.</p>
-            <table style="width:100%;border-collapse:collapse">
-                <thead>
-                    <tr style="background:#1B3A6B;color:white">
-                        <th style="padding:10px;text-align:left">Órgão</th>
-                        <th style="padding:10px;text-align:left">Objeto</th>
-                        <th style="padding:10px;text-align:left">Valor</th>
-                        <th style="padding:10px;text-align:left">Link</th>
-                    </tr>
-                </thead>
-                <tbody>{itens}</tbody>
-            </table>
-            <p style="color:#888;font-size:12px;margin-top:20px">
-                LicitaBot — Monitor Inteligente de Licitações
-            </p>
-        </div>
-    </body>
-    </html>
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:1rem;margin-bottom:1rem">
+        <p style="font-weight:600;color:#0f2444;margin:0 0 0.35rem">{objeto_s}</p>
+        <p style="color:#64748b;font-size:0.85rem;margin:0 0 0.75rem">{orgao_s} — {valor_s}</p>
+        <a href="{link_s}" style="background:#0f2444;color:white;padding:0.35rem 0.85rem;border-radius:6px;text-decoration:none;font-size:0.8rem">Ver edital</a>
+    </div>
     """
+
 
 def disparar_alertas():
     conn = conectar()
@@ -145,41 +91,62 @@ def disparar_alertas():
     cur.execute("SELECT id, nome, email, palavras_chave, plano FROM clientes WHERE ativo = TRUE")
     clientes = cur.fetchall()
 
-    for cliente_row in clientes:
-        cliente_id, nome, email, palavras_chave, plano = cliente_row
+    for cliente_id, nome, email, palavras_chave, plano in clientes:
         palavras_chave = palavras_chave or []
 
-        # Aplicar limite do plano (gratuito=2, basico=5, profissional=20, agencia=ilimitado)
-        limites = {None: 2, "basico": 5, "profissional": 20, "agencia": None}
-        limite = limites.get(plano, 2)
+        # Aplica limite do plano via utils (fonte única)
+        limite = limite_palavras(plano)
         if limite is not None and len(palavras_chave) > limite:
             palavras_chave = palavras_chave[:limite]
 
-        from app.scraper import filtrar_por_palavra_chave
-        licitacoes = filtrar_por_palavra_chave(palavras_chave)
+        if not palavras_chave:
+            continue
 
-        novas = []
-        for l in licitacoes:
-            cur.execute("""
-                SELECT id FROM alertas_enviados
-                WHERE cliente_id = %s AND licitacao_id = (
-                    SELECT id FROM licitacoes WHERE pncp_id = %s
-                )
-            """, (cliente_id, l[0]))
-            if not cur.fetchone():
-                novas.append(l)
+        # Busca todas as licitações que batem com qualquer palavra-chave
+        filtros = " OR ".join(["l.objeto ILIKE %s"] * len(palavras_chave))
+        params = [f"%{p}%" for p in palavras_chave]
+        cur.execute(f"""
+            SELECT l.id, l.pncp_id, l.orgao, l.objeto, l.valor, l.link
+            FROM licitacoes l
+            WHERE {filtros}
+        """, params)
+        candidatas = cur.fetchall()
 
-        if novas:
-            corpo = montar_corpo_email(novas)
-            assunto = f"LicitaBot — {len(novas)} nova(s) licitação(ões) para você"
-            enviado = enviar_email(email, assunto, corpo)
+        if not candidatas:
+            continue
 
-            if enviado:
-                for l in novas:
-                    cur.execute("""
-                        INSERT INTO alertas_enviados (cliente_id, licitacao_id)
-                        VALUES (%s, (SELECT id FROM licitacoes WHERE pncp_id = %s))
-                    """, (cliente_id, l[0]))
+        # FIX N+1: busca todos os alertas já enviados para este cliente de uma só vez
+        ids_candidatas = [l[0] for l in candidatas]
+        cur.execute("""
+            SELECT licitacao_id FROM alertas_enviados
+            WHERE cliente_id = %s AND licitacao_id = ANY(%s)
+        """, (cliente_id, ids_candidatas))
+        ja_enviados = {row[0] for row in cur.fetchall()}
+
+        novas = [l for l in candidatas if l[0] not in ja_enviados]
+
+        if not novas:
+            continue
+
+        # Monta e-mail
+        cards = "".join(_montar_card_licitacao(l[2], l[3], l[4], l[5]) for l in novas)
+        corpo = f"""
+        <div style="font-family:Inter,system-ui,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
+            <h1 style="color:#0f2444;margin-bottom:0.25rem">Licita<span style="color:#c9a84c">Bot</span></h1>
+            <p style="color:#64748b;font-size:0.9rem;margin-bottom:1.5rem">
+                {len(novas)} nova(s) licitação(ões) encontradas para você
+            </p>
+            {cards}
+        </div>
+        """
+        assunto = f"LicitaBot — {len(novas)} nova(s) licitação(ões) para você"
+        enviado = enviar_email(email, assunto, corpo)
+
+        if enviado:
+            cur.executemany(
+                "INSERT INTO alertas_enviados (cliente_id, licitacao_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                [(cliente_id, l[0]) for l in novas],
+            )
 
     conn.commit()
     cur.close()

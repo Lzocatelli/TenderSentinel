@@ -1,25 +1,37 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, abort
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from app.database import conectar
-from app.alertas import enviar_email
-import requests
-import stripe
+import csv
+import hmac
+import html as html_lib
+import io
 import os
 import secrets
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from threading import Thread
+
+import requests
+import stripe
 from dotenv import load_dotenv
+from flask import (Flask, Response, abort, flash, jsonify, redirect,
+                   render_template, request, session, url_for)
+from flask_login import (LoginManager, UserMixin, current_user, login_required,
+                         login_user, logout_user)
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from app.alertas import enviar_email
+from app.database import conectar
+from app.utils import formatar_moeda, limite_palavras
 
 load_dotenv(override=False)
+
+# ── Configuração da aplicação ─────────────────────────────────────────────────
 
 secret_key = os.getenv("SECRET_KEY")
 if not secret_key:
     secret_key = secrets.token_urlsafe(32)
     if os.getenv("FLASK_ENV") != "production":
         print(
-            "WARNING: SECRET_KEY não definido; usando chave temporária apenas para "
-            "desenvolvimento. Defina SECRET_KEY no ambiente em produção."
+            "WARNING: SECRET_KEY não definido; usando chave temporária. "
+            "Defina SECRET_KEY no ambiente em produção."
         )
 
 app = Flask(__name__)
@@ -30,22 +42,49 @@ app.config.update(
     SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
     REMEMBER_COOKIE_DURATION=timedelta(days=30),
 )
-
 app.permanent_session_lifetime = timedelta(days=30)
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-PLANO_LIMITES = {"basico": 5, "profissional": 20, "agencia": None}
-
-def limite_palavras(plano):
-    if not plano:
-        return 2
-    return PLANO_LIMITES.get(plano)
+# ── Login ─────────────────────────────────────────────────────────────────────
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
+
+class Cliente(UserMixin):
+    def __init__(self, id, nome, email, palavras_chave, plano=None):
+        self.id = id
+        self.nome = nome
+        self.email = email
+        self.palavras_chave = palavras_chave or []
+        self.plano = plano
+
+    @property
+    def limite_palavras(self):
+        return limite_palavras(self.plano)
+
+    @property
+    def plano_pago(self):
+        return self.plano in ("basico", "profissional", "agencia")
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, nome, email, palavras_chave, plano FROM clientes WHERE id = %s",
+        (user_id,),
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return Cliente(*row) if row else None
+
+
+# ── CSRF ──────────────────────────────────────────────────────────────────────
 
 def _get_csrf_token():
     token = session.get("_csrf_token")
@@ -62,60 +101,40 @@ app.jinja_env.globals["csrf_token"] = _get_csrf_token
 def verificar_csrf():
     if request.method not in ("POST", "PUT", "DELETE"):
         return
-
-    view = request.endpoint or ""
-    csrf_exempt = {"api_contador", "health", "webhook_stripe"}
-    if view in csrf_exempt:
+    if (request.endpoint or "") in {"api_contador", "health", "webhook_stripe"}:
         return
-
     token_form = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
     token_session = session.get("_csrf_token")
-
-    if not token_form or not token_session or token_form != token_session:
+    if not token_form or not token_session or not hmac.compare_digest(token_form, token_session):
         abort(400)
 
 
-class Cliente(UserMixin):
-    def __init__(self, id, nome, email, palavras_chave, plano=None):
-        self.id = id
-        self.nome = nome
-        self.email = email
-        self.palavras_chave = palavras_chave or []
-        self.plano = plano
+# ── Filtro Jinja ──────────────────────────────────────────────────────────────
 
-    @property
-    def limite_palavras(self):
-        return limite_palavras(self.plano)
-
-
-@login_manager.user_loader
-def load_user(user_id):
-    conn = conectar()
-    cur = conn.cursor()
-    cur.execute("SELECT id, nome, email, palavras_chave, plano FROM clientes WHERE id = %s", (user_id,))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-    if row:
-        return Cliente(row[0], row[1], row[2], row[3], row[4])
-    return None
+@app.template_filter("moeda")
+def moeda_filter(valor):
+    if not valor:
+        return "—"
+    try:
+        return f"R$ {float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "—"
 
 
-# ── Contador com cache e timeout total ───────────────────────────────────────
+# ── Contador com cache ────────────────────────────────────────────────────────
+
 _cache_contador = {"total": 0, "atualizado_em": None}
 
-def contar_licitacoes_hoje():
-    from datetime import datetime
-    agora = datetime.utcnow()
 
-    # Retorna cache se ainda válido (5 min)
+def contar_licitacoes_hoje():
+    agora = datetime.utcnow()
     if _cache_contador["atualizado_em"] and agora - _cache_contador["atualizado_em"] < timedelta(minutes=5):
         return _cache_contador["total"]
 
     hoje = date.today().strftime("%Y%m%d")
     url = "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao"
     total = 0
-    deadline = time.time() + 8  # FIX: timeout total de 8s para não travar o worker
+    deadline = time.time() + 8
 
     for modalidade in [4, 5, 6, 7]:
         if time.time() > deadline:
@@ -126,12 +145,10 @@ def contar_licitacoes_hoje():
                 break
             try:
                 r = requests.get(url, params={
-                    "dataInicial": hoje,
-                    "dataFinal": hoje,
-                    "pagina": pagina,
-                    "tamanhoPagina": 50,
-                    "codigoModalidadeContratacao": modalidade
-                }, timeout=4)  # FIX: timeout por request reduzido para 4s
+                    "dataInicial": hoje, "dataFinal": hoje,
+                    "pagina": pagina, "tamanhoPagina": 50,
+                    "codigoModalidadeContratacao": modalidade,
+                }, timeout=4)
                 if r.status_code == 200:
                     dados = r.json().get("data", [])
                     total += len(dados)
@@ -148,131 +165,16 @@ def contar_licitacoes_hoje():
     return total
 
 
+# ── Rotas públicas ────────────────────────────────────────────────────────────
+
 @app.route("/")
 def index():
     return render_template("index.html", total_hoje=0)
 
 
-@app.route("/cadastro", methods=["GET", "POST"])
-def cadastro():
-    if request.method == "POST":
-        nome = request.form.get("nome")
-        email = request.form.get("email")
-        senha = request.form.get("senha")
-        palavras = request.form.get("palavras_chave", "")
-        palavras_lista = [p.strip() for p in palavras.split(",") if p.strip()]
-
-        limite_free = 2
-        if len(palavras_lista) > limite_free:
-            flash(f"No plano gratuito você pode cadastrar até {limite_free} palavras-chave. As primeiras foram salvas.", "info")
-            palavras_lista = palavras_lista[:limite_free]
-
-        conn = conectar()
-        cur = conn.cursor()
-        cur.execute("SELECT id FROM clientes WHERE email = %s", (email,))
-        if cur.fetchone():
-            flash("E-mail já cadastrado.", "erro")
-            cur.close()
-            conn.close()
-            return render_template("cadastro.html")
-
-        senha_hash = generate_password_hash(senha)
-        cur.execute("""
-            INSERT INTO clientes (nome, email, senha, palavras_chave, ativo)
-            VALUES (%s, %s, %s, %s, TRUE)
-        """, (nome, email, senha_hash, palavras_lista))
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        corpo = f"""
-        <h2>Bem-vindo ao LicitaBot, {nome}!</h2>
-        <p>Seu cadastro foi realizado com sucesso.</p>
-        <p>Você receberá alertas de licitações relacionadas a: <strong>{', '.join(palavras_lista)}</strong></p>
-        """
-        enviar_email(email, "Bem-vindo ao LicitaBot!", corpo)
-        flash("Cadastro realizado! Verifique seu e-mail.", "sucesso")
-        return redirect(url_for("login"))
-
-    return render_template("cadastro.html")
-
-
-@app.template_filter('moeda')
-def moeda_filter(valor):
-    if not valor:
-        return "—"
-    try:
-        return f"R$ {float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    except Exception:
-        return "—"
-
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        email = request.form.get("email")
-        senha = request.form.get("senha")
-
-        conn = conectar()
-        cur = conn.cursor()
-        cur.execute("SELECT id, nome, email, palavras_chave, senha, plano FROM clientes WHERE email = %s", (email,))
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
-
-        if row and check_password_hash(row[4], senha):
-            cliente = Cliente(row[0], row[1], row[2], row[3], row[5])
-            login_user(cliente, remember=True)
-            return redirect(url_for("dashboard"))
-
-        flash("E-mail ou senha incorretos.", "erro")
-
-    return render_template("login.html")
-
-
-@app.route("/logout")
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for("index"))
-
-
-@app.route("/dashboard")
-@login_required
-def dashboard():
-    from app.score import calcular_score
- 
-    conn = conectar()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link
-        FROM licitacoes l
-        JOIN alertas_enviados ae ON ae.licitacao_id = l.id
-        WHERE ae.cliente_id = %s
-        ORDER BY ae.enviado_em DESC
-        LIMIT 50
-    """, (current_user.id,))
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
- 
-    # Calcula score para cada licitação e adiciona como 6º elemento
-    licitacoes = []
-    for row in rows:
-        orgao, objeto, valor, data, link = row
-        score = calcular_score(objeto, current_user.palavras_chave, valor)
-        licitacoes.append((orgao, objeto, valor, data, link, score))
- 
-    # Ordena por score decrescente
-    licitacoes.sort(key=lambda x: x[5], reverse=True)
- 
-    return render_template("dashboard.html", licitacoes=licitacoes, cliente=current_user)
-
-
 @app.route("/api/contador")
 def api_contador():
-    total = contar_licitacoes_hoje()
-    return jsonify({"total": total})
+    return jsonify({"total": contar_licitacoes_hoje()})
 
 
 @app.route("/health")
@@ -288,15 +190,358 @@ def health():
         return jsonify({"status": "error", "database": "unavailable"}), 503
 
 
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+@app.route("/cadastro", methods=["GET", "POST"])
+def cadastro():
+    if request.method == "POST":
+        nome = request.form.get("nome", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "")
+        palavras = request.form.get("palavras_chave", "")
+        palavras_lista = [p.strip() for p in palavras.split(",") if p.strip()]
+
+        limite_free = limite_palavras(None)
+        if len(palavras_lista) > limite_free:
+            flash(f"No plano gratuito você pode cadastrar até {limite_free} palavra-chave. As primeiras foram salvas.", "info")
+            palavras_lista = palavras_lista[:limite_free]
+
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM clientes WHERE email = %s", (email,))
+        if cur.fetchone():
+            flash("E-mail já cadastrado.", "erro")
+            cur.close()
+            conn.close()
+            return render_template("cadastro.html")
+
+        cur.execute(
+            "INSERT INTO clientes (nome, email, senha, palavras_chave, ativo) VALUES (%s, %s, %s, %s, TRUE)",
+            (nome, email, generate_password_hash(senha), palavras_lista),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        enviar_email(email, "Bem-vindo ao LicitaBot!", f"""
+        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
+            <h1 style="color:#0f2444">Licita<span style="color:#c9a84c">Bot</span></h1>
+            <h2>Bem-vindo, {html_lib.escape(nome)}!</h2>
+            <p>Seu cadastro foi realizado. Você receberá alertas sobre:
+               <strong>{html_lib.escape(', '.join(palavras_lista))}</strong></p>
+        </div>
+        """)
+        flash("Cadastro realizado! Verifique seu e-mail.", "sucesso")
+        return redirect(url_for("login"))
+
+    return render_template("cadastro.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        senha = request.form.get("senha", "")
+
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, nome, email, palavras_chave, senha, plano FROM clientes WHERE email = %s",
+            (email,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if row and check_password_hash(row[4], senha):
+            login_user(Cliente(row[0], row[1], row[2], row[3], row[5]), remember=True)
+            return redirect(url_for("dashboard"))
+
+        flash("E-mail ou senha incorretos.", "erro")
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("index"))
+
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    plano_pago = current_user.plano_pago
+    valor_min = request.args.get("valor_min", type=float) if plano_pago else None
+    uf = request.args.get("uf", "").strip().upper() or None if plano_pago else None
+
+    conn = conectar()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link
+            FROM licitacoes l
+            JOIN alertas_enviados ae ON ae.licitacao_id = l.id
+            WHERE ae.cliente_id = %s
+              AND (%s IS NULL OR l.valor >= %s)
+              AND (%s IS NULL OR l.uf = %s)
+            ORDER BY ae.enviado_em DESC
+            LIMIT 50
+        """, [current_user.id, valor_min, valor_min, uf, uf])
+    except Exception:
+        # Coluna uf pode não existir em instâncias mais antigas
+        uf = None
+        cur.execute("""
+            SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link
+            FROM licitacoes l
+            JOIN alertas_enviados ae ON ae.licitacao_id = l.id
+            WHERE ae.cliente_id = %s
+              AND (%s IS NULL OR l.valor >= %s)
+            ORDER BY ae.enviado_em DESC
+            LIMIT 50
+        """, [current_user.id, valor_min, valor_min])
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    if plano_pago:
+        from app.score import calcular_score
+        licitacoes = []
+        for row in rows:
+            orgao, objeto, valor, data, link = row
+            score = calcular_score(objeto, current_user.palavras_chave, valor)
+            licitacoes.append((orgao, objeto, valor, data, link, score))
+        licitacoes.sort(key=lambda x: x[5], reverse=True)
+    else:
+        licitacoes = list(rows)
+
+    return render_template(
+        "dashboard.html",
+        licitacoes=licitacoes,
+        cliente=current_user,
+        show_score=plano_pago,
+        valor_min=valor_min or "",
+        uf_selecionada=uf or "",
+    )
+
+
+# ── Busca manual ──────────────────────────────────────────────────────────────
+
+@app.route("/buscar-agora", methods=["POST"])
+@login_required
+def buscar_agora():
+    if not current_user.plano_pago:
+        flash("A busca manual está disponível a partir do plano Básico. Você receberá alertas automaticamente às 9h.", "info")
+        return redirect(url_for("dashboard"))
+
+    cliente_id = current_user.id
+    cliente_email = current_user.email
+    cliente_palavras = current_user.palavras_chave
+
+    def _rodar(cliente_id, cliente_email, cliente_palavras):
+        from app.scraper import buscar_licitacoes, salvar_licitacoes
+
+        licitacoes = buscar_licitacoes()
+        salvar_licitacoes(licitacoes)
+
+        conn = conectar()
+        cur = conn.cursor()
+        try:
+            # Busca novas licitações para as palavras do cliente
+            filtros = " OR ".join(["l.objeto ILIKE %s"] * len(cliente_palavras))
+            params = [f"%{p}%" for p in cliente_palavras]
+            cur.execute(f"""
+                SELECT l.id, l.pncp_id, l.orgao, l.objeto, l.valor, l.link
+                FROM licitacoes l
+                WHERE {filtros}
+            """, params)
+            candidatas = cur.fetchall()
+
+            ids = [l[0] for l in candidatas]
+            cur.execute(
+                "SELECT licitacao_id FROM alertas_enviados WHERE cliente_id = %s AND licitacao_id = ANY(%s)",
+                (cliente_id, ids),
+            )
+            ja_enviados = {row[0] for row in cur.fetchall()}
+            novas = [l for l in candidatas if l[0] not in ja_enviados]
+
+            if novas:
+                from app.alertas import _montar_card_licitacao
+                cards = "".join(_montar_card_licitacao(l[2], l[3], l[4], l[5]) for l in novas)
+                corpo = f"""
+                <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
+                    <h1 style="color:#0f2444">Licita<span style="color:#c9a84c">Bot</span></h1>
+                    <p style="color:#64748b;margin-bottom:1.5rem">{len(novas)} nova(s) licitação(ões) encontradas!</p>
+                    {cards}
+                </div>
+                """
+                enviar_email(
+                    cliente_email,
+                    f"LicitaBot — {len(novas)} nova(s) licitação(ões) encontradas!",
+                    corpo,
+                )
+                cur.executemany(
+                    "INSERT INTO alertas_enviados (cliente_id, licitacao_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                    [(cliente_id, l[0]) for l in novas],
+                )
+
+            conn.commit()
+        except Exception as e:
+            print(f"Erro buscar_agora: {e}")
+            conn.rollback()
+        finally:
+            cur.close()
+            conn.close()
+
+    Thread(target=_rodar, args=(cliente_id, cliente_email, cliente_palavras), daemon=True).start()
+    flash("Busca iniciada! Se encontrarmos algo novo, você receberá um e-mail em instantes.", "info")
+    return redirect(url_for("dashboard"))
+
+
+# ── Minha Conta ───────────────────────────────────────────────────────────────
+
+@app.route("/minha-conta", methods=["GET", "POST"])
+@login_required
+def minha_conta():
+    renovacao = None
+    if current_user.plano_pago:
+        try:
+            conn = conectar()
+            cur = conn.cursor()
+            cur.execute("SELECT stripe_subscription_id FROM clientes WHERE id = %s", (current_user.id,))
+            row = cur.fetchone()
+            cur.close()
+            conn.close()
+            if row and row[0]:
+                sub = stripe.Subscription.retrieve(row[0])
+                renovacao = datetime.fromtimestamp(sub.current_period_end).strftime("%d/%m/%Y")
+        except Exception:
+            pass
+
+    if request.method == "POST":
+        senha_atual = request.form.get("senha_atual", "")
+        nova_senha = request.form.get("nova_senha", "")
+        confirmar = request.form.get("confirmar_senha", "")
+
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("SELECT senha FROM clientes WHERE id = %s", (current_user.id,))
+        row = cur.fetchone()
+
+        if not row or not check_password_hash(row[0], senha_atual):
+            flash("Senha atual incorreta.", "erro")
+        elif len(nova_senha) < 8:
+            flash("A nova senha deve ter pelo menos 8 caracteres.", "erro")
+        elif nova_senha != confirmar:
+            flash("As senhas não coincidem.", "erro")
+        else:
+            cur.execute(
+                "UPDATE clientes SET senha = %s WHERE id = %s",
+                (generate_password_hash(nova_senha), current_user.id),
+            )
+            conn.commit()
+            flash("Senha alterada com sucesso!", "sucesso")
+
+        cur.close()
+        conn.close()
+
+    return render_template("minha_conta.html", cliente=current_user, renovacao=renovacao)
+
+
+# ── Export CSV ────────────────────────────────────────────────────────────────
+
+@app.route("/export-csv")
+@login_required
+def export_csv():
+    if current_user.plano not in ("profissional", "agencia"):
+        flash("O download de CSV está disponível a partir do plano Profissional.", "info")
+        return redirect(url_for("dashboard"))
+
+    valor_min = request.args.get("valor_min", type=float)
+    uf = request.args.get("uf", "").strip().upper() or None
+
+    conn = conectar()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link, l.uf
+            FROM licitacoes l
+            JOIN alertas_enviados ae ON ae.licitacao_id = l.id
+            WHERE ae.cliente_id = %s
+              AND (%s IS NULL OR l.valor >= %s)
+              AND (%s IS NULL OR l.uf = %s)
+            ORDER BY ae.enviado_em DESC
+            LIMIT 500
+        """, [current_user.id, valor_min, valor_min, uf, uf])
+    except Exception:
+        cur.execute("""
+            SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link
+            FROM licitacoes l
+            JOIN alertas_enviados ae ON ae.licitacao_id = l.id
+            WHERE ae.cliente_id = %s
+              AND (%s IS NULL OR l.valor >= %s)
+            ORDER BY ae.enviado_em DESC
+            LIMIT 500
+        """, [current_user.id, valor_min, valor_min])
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Órgão", "Objeto", "Valor (R$)", "Data publicação", "Link", "UF"])
+    for row in rows:
+        orgao, objeto, valor, data, link = row[:5]
+        uf_val = row[5] if len(row) > 5 else ""
+        writer.writerow([orgao, objeto, formatar_moeda(valor), data, link, uf_val])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=licitacoes.csv"},
+    )
+
+
+# ── Editar palavras-chave ─────────────────────────────────────────────────────
+
+@app.route("/editar-palavras", methods=["GET", "POST"])
+@login_required
+def editar_palavras():
+    if request.method == "POST":
+        palavras_lista = [p.strip() for p in request.form.get("palavras_chave", "").split(",") if p.strip()]
+
+        limite = current_user.limite_palavras
+        if limite is not None and len(palavras_lista) > limite:
+            flash(f"Seu plano permite até {limite} palavras-chave. As primeiras {limite} foram salvas.", "info")
+            palavras_lista = palavras_lista[:limite]
+
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("UPDATE clientes SET palavras_chave = %s WHERE id = %s", (palavras_lista, current_user.id))
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash("Palavras-chave atualizadas com sucesso!", "sucesso")
+        return redirect(url_for("dashboard"))
+
+    return render_template("editar_palavras.html", cliente=current_user)
+
+
+# ── Assinatura / Stripe ───────────────────────────────────────────────────────
+
 @app.route("/assinar/<plano>")
 @login_required
 def assinar(plano):
-    if current_user.plano in ('basico', 'profissional', 'agencia'):
+    if current_user.plano_pago:
         flash("Você já possui uma assinatura ativa. Para trocar de plano, cancele o atual primeiro.", "info")
         return redirect(url_for("dashboard"))
 
     periodo = request.args.get("periodo", "mensal")
-
     precos = {
         "basico":               os.getenv("STRIPE_PRICE_BASICO"),
         "profissional":         os.getenv("STRIPE_PRICE_PROFISSIONAL"),
@@ -305,29 +550,25 @@ def assinar(plano):
         "profissional_anual":   os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL"),
         "agencia_anual":        os.getenv("STRIPE_PRICE_AGENCIA_ANUAL"),
     }
-
-    chave = f"{plano}_anual" if periodo == "anual" else plano
-    price_id = precos.get(chave)
+    price_id = precos.get(f"{plano}_anual" if periodo == "anual" else plano)
 
     if not price_id:
         flash("Plano inválido.", "erro")
         return redirect(url_for("index"))
 
-    customer_id = None
     conn = conectar()
     cur = conn.cursor()
     cur.execute("SELECT stripe_customer_id FROM clientes WHERE id = %s", (current_user.id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
-    if row and row[0]:
-        customer_id = row[0]
+    customer_id = row[0] if row and row[0] else None
 
     checkout_session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         mode="subscription",
         line_items=[{"price": price_id, "quantity": 1}],
-        customer=customer_id if customer_id else None,
+        customer=customer_id,
         customer_email=None if customer_id else current_user.email,
         metadata={"cliente_id": current_user.id},
         subscription_data={"trial_period_days": 7},
@@ -337,85 +578,38 @@ def assinar(plano):
     return redirect(checkout_session.url, code=303)
 
 
-from threading import Thread
-
-@app.route("/buscar-agora", methods=["POST"])
+@app.route("/gerenciar-assinatura")
 @login_required
-def buscar_agora():
-    cliente_id = current_user.id
-    cliente_email = current_user.email
-    cliente_palavras = current_user.palavras_chave
+def gerenciar_assinatura():
+    conn = conectar()
+    cur = conn.cursor()
+    cur.execute("SELECT stripe_customer_id FROM clientes WHERE id = %s", (current_user.id,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
 
-    def rodar_em_background(cliente_id, cliente_email, cliente_palavras):
-        try:
-            from app.scraper import buscar_licitacoes, salvar_licitacoes
-            from app.alertas import enviar_email
-            from app.database import conectar
+    if not row or not row[0]:
+        flash("Nenhuma assinatura encontrada.", "info")
+        return redirect(url_for("dashboard"))
 
-            licitacoes = buscar_licitacoes()
-            salvar_licitacoes(licitacoes)
-
-            conn = conectar()
-            cur = conn.cursor()
-
-            novas = []
-            for palavra in cliente_palavras:
-                cur.execute("""
-                    SELECT l.id, l.pncp_id, l.orgao, l.objeto, l.valor, l.link
-                    FROM licitacoes l
-                    WHERE l.objeto ILIKE %s
-                    AND NOT EXISTS (
-                        SELECT 1 FROM alertas_enviados ae
-                        WHERE ae.cliente_id = %s AND ae.licitacao_id = l.id
-                    )
-                """, (f"%{palavra}%", cliente_id))
-                novas.extend(cur.fetchall())
-
-            vistos = set()
-            novas_unicas = []
-            for l in novas:
-                if l[0] not in vistos:
-                    vistos.add(l[0])
-                    novas_unicas.append(l)
-
-            if novas_unicas:
-                itens_html = ""
-                for l in novas_unicas:
-                    lid, pncp_id, orgao, objeto, valor, link = l
-                    valor_fmt = f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if valor else "Não informado"
-                    itens_html += f"""
-                    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:1rem;margin-bottom:1rem">
-                        <p style="font-weight:600;color:#0f1f3d;margin:0 0 0.5rem">{objeto}</p>
-                        <p style="color:#6b7280;font-size:0.85rem;margin:0 0 0.75rem">{orgao} — {valor_fmt}</p>
-                        <a href="{link}" style="background:#0f1f3d;color:white;padding:0.35rem 0.85rem;border-radius:6px;text-decoration:none;font-size:0.8rem">Ver edital</a>
-                    </div>
-                    """
-                    cur.execute("""
-                        INSERT INTO alertas_enviados (cliente_id, licitacao_id)
-                        VALUES (%s, %s)
-                        ON CONFLICT DO NOTHING
-                    """, (cliente_id, lid))
-
-                corpo = f"""
-                <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-                    <h1 style="color:#0f1f3d">Licita<span style="color:#d4af37">Bot</span></h1>
-                    <p>{len(novas_unicas)} nova(s) licitação(ões) encontradas agora!</p>
-                    {itens_html}
-                </div>
-                """
-                enviar_email(cliente_email, f"LicitaBot — {len(novas_unicas)} nova(s) licitação(ões) encontradas!", corpo)
-
-            conn.commit()
-            cur.close()
-            conn.close()
-
-        except Exception as e:
-            print(f"Erro no buscar_agora background: {e}")
-
-    Thread(target=rodar_em_background, args=(cliente_id, cliente_email, cliente_palavras)).start()
-
-    flash("Busca iniciada! Se encontrarmos algo novo, você receberá um e-mail em instantes.", "info")
-    return redirect(url_for("dashboard"))
+    try:
+        portal = stripe.billing_portal.Session.create(
+            customer=row[0],
+            return_url=request.host_url + "dashboard",
+        )
+        return redirect(portal.url, code=303)
+    except stripe.error.InvalidRequestError:
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE clientes SET stripe_customer_id = NULL, stripe_subscription_id = NULL, plano = NULL WHERE id = %s",
+            (current_user.id,),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash("Assinatura não encontrada. Seu plano foi resetado — assine novamente.", "info")
+        return redirect(url_for("index"))
 
 
 @app.route("/pagamento/sucesso")
@@ -445,7 +639,6 @@ def webhook_stripe():
     if event["type"] == "checkout.session.completed":
         sess = event["data"]["object"]
         session_id = sess["id"]
-
         cliente_id = sess["metadata"].get("cliente_id")
         if not cliente_id:
             return "", 200
@@ -455,6 +648,8 @@ def webhook_stripe():
 
         conn = conectar()
         cur = conn.cursor()
+
+        # Idempotência: ignora se já processou esta sessão
         cur.execute("SELECT stripe_last_session_id FROM clientes WHERE id = %s", (cliente_id,))
         row = cur.fetchone()
         if row and row[0] == session_id:
@@ -462,10 +657,11 @@ def webhook_stripe():
             conn.close()
             return "", 200
 
-        cur.execute("""
-            SELECT id FROM clientes
-            WHERE id = %s AND (stripe_customer_id = %s OR stripe_customer_id IS NULL)
-        """, (cliente_id, customer_id))
+        # Valida que o customer bate com o registro
+        cur.execute(
+            "SELECT id FROM clientes WHERE id = %s AND (stripe_customer_id = %s OR stripe_customer_id IS NULL)",
+            (cliente_id, customer_id),
+        )
         if not cur.fetchone():
             cur.close()
             conn.close()
@@ -474,28 +670,27 @@ def webhook_stripe():
         plano = "basico"
         try:
             for item in stripe.checkout.Session.list_line_items(session_id).data:
-                price_id = item.price.id
-                if price_id in (os.getenv("STRIPE_PRICE_PROFISSIONAL"), os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL")):
+                pid = item.price.id
+                if pid in (os.getenv("STRIPE_PRICE_PROFISSIONAL"), os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL")):
                     plano = "profissional"
-                elif price_id in (os.getenv("STRIPE_PRICE_AGENCIA"), os.getenv("STRIPE_PRICE_AGENCIA_ANUAL")):
+                elif pid in (os.getenv("STRIPE_PRICE_AGENCIA"), os.getenv("STRIPE_PRICE_AGENCIA_ANUAL")):
                     plano = "agencia"
         except Exception:
             pass
 
-        cur.execute("""
-            UPDATE clientes
-            SET plano = %s, stripe_customer_id = %s, stripe_subscription_id = %s, stripe_last_session_id = %s
-            WHERE id = %s
-        """, (plano, customer_id, subscription_id, session_id, cliente_id))
+        cur.execute(
+            "UPDATE clientes SET plano=%s, stripe_customer_id=%s, stripe_subscription_id=%s, stripe_last_session_id=%s WHERE id=%s",
+            (plano, customer_id, subscription_id, session_id, cliente_id),
+        )
 
+        # Adiciona à newsletter se ainda não estiver
         cur.execute("SELECT id FROM newsletter WHERE email = (SELECT email FROM clientes WHERE id = %s)", (cliente_id,))
         if not cur.fetchone():
-            token_nl = secrets.token_urlsafe(32)
             cur.execute("""
                 INSERT INTO newsletter (email, nome, token_descadastro)
                 SELECT email, nome, %s FROM clientes WHERE id = %s
                 ON CONFLICT (email) DO NOTHING
-            """, (token_nl, cliente_id))
+            """, (secrets.token_urlsafe(32), cliente_id))
 
         conn.commit()
         cur.close()
@@ -505,7 +700,10 @@ def webhook_stripe():
         subscription_id = event["data"]["object"]["id"]
         conn = conectar()
         cur = conn.cursor()
-        cur.execute("UPDATE clientes SET plano = NULL, stripe_customer_id = NULL, stripe_subscription_id = NULL WHERE stripe_subscription_id = %s", (subscription_id,))
+        cur.execute(
+            "UPDATE clientes SET plano=NULL, stripe_customer_id=NULL, stripe_subscription_id=NULL WHERE stripe_subscription_id=%s",
+            (subscription_id,),
+        )
         conn.commit()
         cur.close()
         conn.close()
@@ -513,66 +711,7 @@ def webhook_stripe():
     return "", 200
 
 
-@app.route("/editar-palavras", methods=["GET", "POST"])
-@login_required
-def editar_palavras():
-    if request.method == "POST":
-        palavras = request.form.get("palavras_chave", "")
-        palavras_lista = [p.strip() for p in palavras.split(",") if p.strip()]
-
-        limite = current_user.limite_palavras
-        if limite is not None and len(palavras_lista) > limite:
-            flash(f"Seu plano permite até {limite} palavras-chave. As primeiras {limite} foram salvas.", "info")
-            palavras_lista = palavras_lista[:limite]
-
-        conn = conectar()
-        cur = conn.cursor()
-        cur.execute("UPDATE clientes SET palavras_chave = %s WHERE id = %s", (palavras_lista, current_user.id))
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        flash("Palavras-chave atualizadas com sucesso!", "sucesso")
-        return redirect(url_for("dashboard"))
-
-    return render_template("editar_palavras.html", cliente=current_user)
-
-
-@app.route("/gerenciar-assinatura")
-@login_required
-def gerenciar_assinatura():
-    conn = conectar()
-    cur = conn.cursor()
-    cur.execute("SELECT stripe_customer_id FROM clientes WHERE id = %s", (current_user.id,))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    if not row or not row[0]:
-        flash("Nenhuma assinatura encontrada.", "info")
-        return redirect(url_for("dashboard"))
-
-    try:
-        portal_session = stripe.billing_portal.Session.create(
-            customer=row[0],
-            return_url=request.host_url + "dashboard",
-        )
-        return redirect(portal_session.url, code=303)
-    except stripe.error.InvalidRequestError:
-        # FIX: customer não existe mais no Stripe — limpa o banco e redireciona
-        conn = conectar()
-        cur = conn.cursor()
-        cur.execute("""
-            UPDATE clientes
-            SET stripe_customer_id = NULL, stripe_subscription_id = NULL, plano = NULL
-            WHERE id = %s
-        """, (current_user.id,))
-        conn.commit()
-        cur.close()
-        conn.close()
-        flash("Assinatura não encontrada. Seu plano foi resetado — assine novamente.", "info")
-        return redirect(url_for("index"))
-
+# ── Newsletter ────────────────────────────────────────────────────────────────
 
 @app.route("/newsletter/cadastro", methods=["POST"])
 def newsletter_cadastro():
@@ -584,7 +723,6 @@ def newsletter_cadastro():
         return redirect(url_for("index") + "#newsletter")
 
     token = secrets.token_urlsafe(32)
-
     conn = conectar()
     cur = conn.cursor()
     cur.execute("SELECT id, ativo FROM newsletter WHERE email = %s", (email,))
@@ -601,26 +739,25 @@ def newsletter_cadastro():
         conn.close()
         return redirect(url_for("index") + "#newsletter")
 
-    cur.execute("""
-        INSERT INTO newsletter (email, nome, token_descadastro)
-        VALUES (%s, %s, %s)
-    """, (email, nome, token))
+    cur.execute(
+        "INSERT INTO newsletter (email, nome, token_descadastro) VALUES (%s, %s, %s)",
+        (email, nome, token),
+    )
     conn.commit()
     cur.close()
     conn.close()
 
-    corpo = f"""
+    enviar_email(email, "Você está no Radar Semanal do LicitaBot!", f"""
     <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-        <h1 style="color:#0f1f3d">Licita<span style="color:#d4af37">Bot</span></h1>
-        <p>Olá, <strong>{nome}</strong>!</p>
-        <p>Você está cadastrado no <strong>Radar Semanal de Licitações</strong>. Toda segunda às 9h você recebe as melhores oportunidades da semana.</p>
-        <p style="color:#6b7280;font-size:0.85rem">
+        <h1 style="color:#0f2444">Licita<span style="color:#c9a84c">Bot</span></h1>
+        <p>Olá, <strong>{html_lib.escape(nome)}</strong>!</p>
+        <p>Você está no <strong>Radar Semanal</strong>. Toda segunda às 9h você recebe as melhores oportunidades da semana.</p>
+        <p style="color:#64748b;font-size:0.85rem;margin-top:1.5rem">
             Não quer mais receber?
-            <a href="{request.host_url}newsletter/descadastro/{token}" style="color:#d4af37">Clique aqui para se descadastrar.</a>
+            <a href="{request.host_url}newsletter/descadastro/{token}" style="color:#c9a84c">Clique aqui para se descadastrar.</a>
         </p>
     </div>
-    """
-    enviar_email(email, "Você está no Radar Semanal do LicitaBot!", corpo)
+    """)
     flash("Cadastrado! Você receberá a newsletter toda segunda.", "sucesso")
     return redirect(url_for("index") + "#newsletter")
 

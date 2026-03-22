@@ -12,13 +12,6 @@
     <a href="/" class="nav-logo">Licita<span>Bot</span></a>
     <div class="nav-links">
         <a href="/cadastro">Criar conta</a>
-        <button class="dark-toggle" onclick="toggleDark()" title="Alternar modo escuro" style="background:none;border:none;cursor:pointer;">
-    <div class="dark-toggle-track">
-        <div class="dark-toggle-thumb" id="dark-thumb">
-            <span class="dark-toggle-icon" id="dark-icon">☀️</span>
-        </div>
-    </div>
-</button>
     </div>
 </nav>
 
@@ -55,23 +48,6 @@
 <footer>
     <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
 </footer>
-<script>
-    function applyTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        const icon = document.getElementById('dark-icon');
-        if (icon) icon.textContent = theme === 'dark' ? '🌙' : '☀️';
-        localStorage.setItem('theme', theme);
-    }
-    function toggleDark() {
-        const current = document.documentElement.getAttribute('data-theme');
-        applyTheme(current === 'dark' ? 'light' : 'dark');
-    }
-    (function() {
-        const saved = localStorage.getItem('theme') ||
-            (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        applyTheme(saved);
-    })();
-</script>
 
 </body>
 </html>
