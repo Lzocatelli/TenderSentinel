@@ -292,7 +292,8 @@ def dashboard():
             LIMIT 50
         """, [current_user.id, valor_min, valor_min, uf, uf])
     except Exception:
-        # Coluna uf pode não existir em instâncias mais antigas
+        # Coluna uf pode não existir em instâncias mais antigas — rollback obrigatório
+        conn.rollback()
         uf = None
         cur.execute("""
             SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link
