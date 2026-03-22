@@ -8,6 +8,19 @@ from dotenv import load_dotenv
 from app.database import conectar
 from app.utils import limite_palavras, formatar_moeda
 
+BASE_URL = os.getenv("BASE_URL", "https://web-production-54881.up.railway.app")
+
+_EMAIL_BANNER = """
+<div style="background:linear-gradient(135deg,#0f1f3d 0%,#1a3a6b 100%);padding:28px 32px;text-align:center;border-radius:12px 12px 0 0">
+    <div style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;font-family:Georgia,serif">
+        Licita<span style="color:#d4af37">Bot</span>
+    </div>
+    <div style="font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-top:5px">
+        Monitor Inteligente de Licitações
+    </div>
+</div>
+"""
+
 load_dotenv()
 
 
@@ -72,14 +85,17 @@ def enviar_email(destinatario, assunto, corpo):
 
 def _montar_card_licitacao(orgao, objeto, valor, link):
     orgao_s = html.escape(str(orgao or "N/A"))
-    objeto_s = html.escape(str(objeto or "N/A")[:280])
+    obj_raw = str(objeto or "N/A")
+    objeto_s = html.escape(obj_raw[:280] + ("…" if len(obj_raw) > 280 else ""))
     valor_s = formatar_moeda(valor)
     link_s = html.escape(str(link or "#"))
     return f"""
-    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:1rem;margin-bottom:1rem">
-        <p style="font-weight:600;color:#0f2444;margin:0 0 0.35rem">{objeto_s}</p>
-        <p style="color:#64748b;font-size:0.85rem;margin:0 0 0.75rem">{orgao_s} — {valor_s}</p>
-        <a href="{link_s}" style="background:#0f2444;color:white;padding:0.35rem 0.85rem;border-radius:6px;text-decoration:none;font-size:0.8rem">Ver edital</a>
+    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:16px 18px;margin-bottom:12px;background:#ffffff">
+        <p style="font-size:14px;font-weight:600;color:#0f1f3d;margin:0 0 6px;line-height:1.45">{objeto_s}</p>
+        <p style="font-size:12px;color:#64748b;margin:0 0 12px">
+            {orgao_s} &nbsp;·&nbsp; <strong style="color:#0f1f3d">{valor_s}</strong>
+        </p>
+        <a href="{link_s}" style="display:inline-block;background:#0f1f3d;color:#ffffff;text-decoration:none;font-size:12px;font-weight:600;padding:7px 16px;border-radius:6px">Ver edital →</a>
     </div>
     """
 
@@ -129,17 +145,48 @@ def disparar_alertas():
             continue
 
         # Monta e-mail
+        primeiro_nome = html.escape(nome.split()[0]) if nome else "você"
         cards = "".join(_montar_card_licitacao(l[2], l[3], l[4], l[5]) for l in novas)
-        corpo = f"""
-        <div style="font-family:Inter,system-ui,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-            <h1 style="color:#0f2444;margin-bottom:0.25rem">Licita<span style="color:#c9a84c">Bot</span></h1>
-            <p style="color:#64748b;font-size:0.9rem;margin-bottom:1.5rem">
-                {len(novas)} nova(s) licitação(ões) encontradas para você
-            </p>
-            {cards}
+        qtd = len(novas)
+        plural = "licitação encontrada" if qtd == 1 else "licitações encontradas"
+        corpo = f"""<!DOCTYPE html>
+<html lang="pt-br">
+<head><meta charset="UTF-8"><title>Novas licitações — LicitaBot</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:24px 16px;">
+
+    {_EMAIL_BANNER}
+
+    <div style="background:#ffffff;padding:28px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0">
+        <p style="font-size:16px;font-weight:600;color:#0f1f3d;margin:0 0 4px">
+            Olá, {primeiro_nome}!
+        </p>
+        <p style="font-size:13px;color:#64748b;margin:0 0 24px;line-height:1.6">
+            Encontramos <strong style="color:#0f1f3d">{qtd} {plural}</strong> para as suas palavras-chave. Confira abaixo:
+        </p>
+
+        {cards}
+
+        <div style="text-align:center;margin-top:24px">
+            <a href="{BASE_URL}/dashboard"
+               style="display:inline-block;background:#d4af37;color:#0f1f3d;text-decoration:none;
+                      font-size:14px;font-weight:700;padding:12px 28px;border-radius:8px">
+                Ver todas no dashboard
+            </a>
         </div>
-        """
-        assunto = f"LicitaBot — {len(novas)} nova(s) licitação(ões) para você"
+    </div>
+
+    <div style="background:#0f1f3d;padding:18px 32px;text-align:center;border-radius:0 0 12px 12px">
+        <p style="font-size:11px;color:rgba(255,255,255,0.4);margin:0;line-height:1.6">
+            Você recebe estes alertas porque monitoramos licitações para o seu perfil.<br>
+            <a href="{BASE_URL}/minha-conta" style="color:rgba(255,255,255,0.4)">Gerenciar conta</a>
+        </p>
+    </div>
+
+</div>
+</body>
+</html>"""
+        assunto = f"LicitaBot — {qtd} {plural} para você"
         enviado = enviar_email(email, assunto, corpo)
 
         if enviado:
