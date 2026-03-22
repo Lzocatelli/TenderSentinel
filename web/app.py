@@ -278,32 +278,44 @@ def dashboard():
     valor_min = request.args.get("valor_min", type=float) if plano_pago else None
     uf = request.args.get("uf", "").strip().upper() or None if plano_pago else None
 
+    palavras = current_user.palavras_chave or []
+    if not palavras:
+        return render_template(
+            "dashboard.html",
+            licitacoes=[],
+            cliente=current_user,
+            show_score=plano_pago,
+            valor_min=valor_min or "",
+            uf_selecionada=uf or "",
+        )
+
+    filtros_kw = " OR ".join(["l.objeto ILIKE %s"] * len(palavras))
+    params_kw = [f"%{p}%" for p in palavras]
+
     conn = conectar()
     cur = conn.cursor()
     try:
-        cur.execute("""
+        cur.execute(f"""
             SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link
             FROM licitacoes l
-            JOIN alertas_enviados ae ON ae.licitacao_id = l.id
-            WHERE ae.cliente_id = %s
+            WHERE ({filtros_kw})
               AND (%s IS NULL OR l.valor >= %s)
               AND (%s IS NULL OR l.uf = %s)
-            ORDER BY ae.enviado_em DESC
+            ORDER BY l.data_publicacao DESC
             LIMIT 50
-        """, [current_user.id, valor_min, valor_min, uf, uf])
+        """, params_kw + [valor_min, valor_min, uf, uf])
     except Exception:
         # Coluna uf pode não existir em instâncias mais antigas — rollback obrigatório
         conn.rollback()
         uf = None
-        cur.execute("""
+        cur.execute(f"""
             SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link
             FROM licitacoes l
-            JOIN alertas_enviados ae ON ae.licitacao_id = l.id
-            WHERE ae.cliente_id = %s
+            WHERE ({filtros_kw})
               AND (%s IS NULL OR l.valor >= %s)
-            ORDER BY ae.enviado_em DESC
+            ORDER BY l.data_publicacao DESC
             LIMIT 50
-        """, [current_user.id, valor_min, valor_min])
+        """, params_kw + [valor_min, valor_min])
 
     rows = cur.fetchall()
     cur.close()
@@ -314,7 +326,7 @@ def dashboard():
         licitacoes = []
         for row in rows:
             orgao, objeto, valor, data, link = row
-            score = calcular_score(objeto, current_user.palavras_chave, valor)
+            score = calcular_score(objeto, palavras, valor)
             licitacoes.append((orgao, objeto, valor, data, link, score))
         licitacoes.sort(key=lambda x: x[5], reverse=True)
     else:
