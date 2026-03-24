@@ -1,279 +1,506 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html class="light" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LicitaBot — Monitor Inteligente de Licitações</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        html { scroll-behavior: smooth; }
-        .hero { will-change: transform; transition: transform 0.1s linear; }
-        .reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.65s cubic-bezier(.22,1,.36,1), transform 0.65s cubic-bezier(.22,1,.36,1); }
-        .reveal.visible { opacity: 1; transform: translateY(0); }
-        .reveal-delay-1 { transition-delay: 0.1s; }
-        .reveal-delay-2 { transition-delay: 0.2s; }
-        .reveal-delay-3 { transition-delay: 0.3s; }
-        .reveal-delay-4 { transition-delay: 0.4s; }
-        #contador { transition: transform 0.3s ease, color 0.3s ease; }
-        #contador.bump { transform: scale(1.08); color: #f0cc6a; }
-        .plan-card { transition: transform 0.3s cubic-bezier(.22,1,.36,1), box-shadow 0.3s ease !important; }
-        .plan-card:hover { transform: translateY(-6px) !important; box-shadow: 0 20px 48px rgba(15,31,61,0.13) !important; }
-        .plan-card.featured:hover { transform: translateY(-10px) scale(1.02) !important; }
-        .plan-card.disabled { opacity: 0.55; pointer-events: none; filter: grayscale(0.4); }
-        .plan-card.disabled:hover { transform: none !important; box-shadow: none !important; }
-        nav { transition: background 0.3s ease, backdrop-filter 0.3s ease, box-shadow 0.3s ease; }
-        nav.scrolled { background: rgba(15,31,61,0.92) !important; backdrop-filter: blur(12px); box-shadow: 0 2px 24px rgba(0,0,0,0.18); }
-        .btn { transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease !important; }
-        .btn:hover { transform: translateY(-2px) !important; filter: brightness(1.08); }
-        .btn:active { transform: translateY(0) !important; }
-        .step-card { transition: transform 0.3s cubic-bezier(.22,1,.36,1), box-shadow 0.3s ease; border-radius: 16px; }
-        .step-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(15,31,61,0.08); }
-        .step-number { transition: transform 0.3s ease, box-shadow 0.3s ease; }
-        .step-card:hover .step-number { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(212,175,55,0.18); }
-        #toggle-ball { transition: left 0.25s cubic-bezier(.22,1,.36,1) !important; }
-        .newsletter-input { transition: box-shadow 0.2s ease, border-color 0.2s ease; outline: none; }
-        .newsletter-input:focus { box-shadow: 0 0 0 3px rgba(212,175,55,0.3); }
-        .animated-divider { width: 0; height: 2px; background: linear-gradient(90deg, var(--gold), transparent); transition: width 1s cubic-bezier(.22,1,.36,1); margin: 0 auto 1rem; }
-        .animated-divider.visible { width: 80px; }
-        .contador-section { position: relative; overflow: hidden; }
-        .contador-section::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(212,175,55,0.07) 0%, transparent 70%); pointer-events: none; }
-        .score-info { display: block; font-size: 0.78rem; color: var(--gray-500); margin-top: 0.3rem; line-height: 1.4; padding-left: 0.5rem; border-left: 2px solid var(--blue); }
-    </style>
-</head>
-<body>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TenderSentinel | US Procurement Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&family=Work+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "surface-container-highest": "#d3e4fe",
+                    "surface-dim": "#cbdbf5",
+                    "on-secondary-fixed": "#341100",
+                    "on-background": "#0b1c30",
+                    "on-surface": "#0b1c30",
+                    "tertiary-container": "#001e2f",
+                    "error": "#ba1a1a",
+                    "inverse-on-surface": "#eaf1ff",
+                    "on-secondary": "#ffffff",
+                    "secondary": "#9f4200",
+                    "surface-tint": "#565e74",
+                    "secondary-container": "#fc7218",
+                    "primary-fixed-dim": "#bec6e0",
+                    "inverse-primary": "#bec6e0",
+                    "on-primary-fixed": "#131b2e",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-high": "#dce9ff",
+                    "outline-variant": "#c6c6cd",
+                    "surface": "#f8f9ff",
+                    "on-tertiary-fixed": "#001e2f",
+                    "surface-container-low": "#eff4ff",
+                    "on-tertiary-fixed-variant": "#004c6e",
+                    "surface-bright": "#f8f9ff",
+                    "primary-container": "#131b2e",
+                    "on-primary-container": "#7c839b",
+                    "background": "#f8f9ff",
+                    "on-primary-fixed-variant": "#3f465c",
+                    "tertiary-fixed": "#c9e6ff",
+                    "secondary-fixed": "#ffdbcb",
+                    "inverse-surface": "#213145",
+                    "primary-fixed": "#dae2fd",
+                    "on-error": "#ffffff",
+                    "secondary-fixed-dim": "#ffb692",
+                    "surface-variant": "#d3e4fe",
+                    "tertiary": "#000000",
+                    "primary": "#000000",
+                    "on-surface-variant": "#45464d",
+                    "on-tertiary-container": "#008cc7",
+                    "on-secondary-fixed-variant": "#793100",
+                    "surface-container": "#e5eeff",
+                    "tertiary-fixed-dim": "#89ceff",
+                    "error-container": "#ffdad6",
+                    "on-primary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "outline": "#76777d",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-container": "#592200"
+                },
+                fontFamily: {
+                    "headline": ["Inter"],
+                    "body": ["Work Sans"],
+                    "label": ["Space Grotesk"]
+                },
+                borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+            },
+        },
+    }
+</script>
+<style>
+    .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        vertical-align: middle;
+    }
+    .pulse-dot {
+        width: 8px; height: 8px;
+        background-color: #9f4200;
+        border-radius: 50%;
+        display: inline-block;
+        position: relative;
+    }
+    .pulse-dot::after {
+        content: '';
+        position: absolute;
+        width: 100%; height: 100%;
+        top: 0; left: 0;
+        background-color: #9f4200;
+        border-radius: 50%;
+        z-index: -1;
+        opacity: 0.7;
+        animation: ripple 2s infinite ease-out;
+    }
+    @keyframes ripple {
+        0%   { transform: scale(1); opacity: 0.7; }
+        100% { transform: scale(3); opacity: 0; }
+    }
 
-<nav>
-    <a href="/" class="nav-logo">Licita<span>Bot</span></a>
-    <div class="nav-links">
-    {% if current_user.is_authenticated %}
-        <a href="/dashboard">Dashboard</a>
-        <a href="/logout">Sair</a>
-    {% else %}
-        <a href="/login">Entrar</a>
-        <a href="/cadastro" class="btn btn-primary" style="padding:0.5rem 1.25rem">Começar grátis</a>
-    {% endif %}
+    /* Scroll reveal */
+    .reveal {
+        opacity: 0;
+        transform: translateY(28px);
+        transition: opacity 0.65s cubic-bezier(.22,1,.36,1), transform 0.65s cubic-bezier(.22,1,.36,1);
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+
+    #contador { transition: transform 0.3s ease, color 0.3s ease; }
+    #contador.bump { transform: scale(1.08); color: #fc7218; }
+
+    html { scroll-behavior: smooth; }
+</style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-secondary-container selection:text-on-secondary-container">
+
+<!-- Nav -->
+<nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm">
+<div class="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
+    <div class="text-xl font-black tracking-tighter text-slate-950 font-headline">TenderSentinel</div>
+    <div class="hidden md:flex items-center space-x-8">
+        <a class="font-headline font-bold tracking-tight text-sm uppercase text-orange-700 border-b-2 border-orange-700 pb-1" href="#how">How it Works</a>
+        <a class="font-headline font-bold tracking-tight text-sm uppercase text-slate-600 hover:text-slate-900 transition-colors" href="#planos">Pricing</a>
+        <a class="font-headline font-bold tracking-tight text-sm uppercase text-slate-600 hover:text-slate-900 transition-colors" href="#newsletter">Newsletter</a>
     </div>
+    <div class="flex items-center space-x-4">
+        {% if current_user.is_authenticated %}
+        <a href="/dashboard" class="px-4 py-2 text-sm font-bold font-headline text-slate-950 hover:bg-slate-100 rounded-md transition-all">Dashboard</a>
+        <a href="/logout" class="px-5 py-2 text-sm font-bold font-headline bg-primary text-white rounded-md">Sign out</a>
+        {% else %}
+        <a href="/login" class="px-4 py-2 text-sm font-bold font-headline text-slate-950 hover:bg-slate-100 rounded-md transition-all">Login</a>
+        <a href="/cadastro" class="px-5 py-2 text-sm font-bold font-headline bg-primary text-white rounded-md active:scale-95 duration-150">Get Started</a>
+        {% endif %}
+    </div>
+</div>
 </nav>
 
-<section class="hero" id="hero">
-    <h1 class="reveal">Nunca perca uma<br><span>licitação pública</span></h1>
-    <p class="reveal reveal-delay-1">Monitoramos o PNCP e enviamos alertas personalizados toda vez que surgir uma oportunidade para o seu negócio.</p>
-    <div class="reveal reveal-delay-2" style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
-        <a href="/cadastro" class="btn btn-gold">Criar conta grátis</a>
-        <a href="#planos" class="btn btn-outline">Ver planos</a>
+<!-- Hero -->
+<section class="relative pt-32 pb-24 overflow-hidden bg-gradient-to-b from-primary-container to-surface">
+<div class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+    <div class="lg:col-span-7 z-10">
+        <div class="reveal inline-flex items-center space-x-2 bg-surface-container-highest/10 px-3 py-1 rounded-full mb-6">
+            <span class="pulse-dot"></span>
+            <span class="font-label text-xs uppercase tracking-widest text-on-primary-container">Live Intelligence Feed Active</span>
+        </div>
+        <h1 class="reveal reveal-delay-1 font-headline text-5xl md:text-7xl font-black tracking-tighter text-white mb-6 leading-[1.1]">
+            Dominate the <span class="text-secondary-container">US Government</span> Contract Market.
+        </h1>
+        <p class="reveal reveal-delay-2 font-body text-lg md:text-xl text-on-primary-container mb-10 max-w-2xl leading-relaxed">
+            TenderSentinel monitors SAM.gov in real-time and sends personalized alerts scored by NAICS match, set-aside eligibility, and contract value. Never miss a high-value opportunity again.
+        </p>
+        <div class="reveal reveal-delay-3 flex flex-col sm:flex-row gap-4">
+            <a href="/cadastro" class="px-8 py-4 bg-secondary text-white font-headline font-bold rounded-lg text-lg flex items-center justify-center gap-2 shadow-xl shadow-secondary/20">
+                Get Started <span class="material-symbols-outlined text-xl">arrow_forward</span>
+            </a>
+            <a href="#planos" class="px-8 py-4 bg-white/10 backdrop-blur-md text-white border border-white/20 font-headline font-bold rounded-lg text-lg hover:bg-white/20 transition-all text-center">
+                View Plans
+            </a>
+        </div>
     </div>
+    <div class="lg:col-span-5 relative">
+        <div class="aspect-square bg-surface-container-highest rounded-xl overflow-hidden shadow-2xl rotate-3 relative z-10">
+            <img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuChr2fZeqjtN0XYqOZnzOIIOeuID9bA5OEUGRo8Fz7AjkdRafnDHWPme-ZciP4MjixeBsDqIhuzdBjUBE52uUg0KYIZmWUbWX29CjRf__-WI7ah2QPMqXFMCXvzWPgs7uiXOGj8eFfC7R7xNipBieR_1BPdAtsfNnLRZSb8_b3Rc-ikaCXNUR0LD15QidNRlENcVZnbsktPTl9mc2klV6qSiEwWBZ0-tDwOUwI5Q7cNRKN2abhv4LKzwpvAe4P-7_owlO5NVIk4_Ss" alt="Federal contract monitoring dashboard"/>
+            <div class="absolute inset-0 bg-gradient-to-t from-primary-container/80 to-transparent"></div>
+            <div class="absolute bottom-6 left-6 right-6 p-4 bg-white/10 backdrop-blur-xl rounded-lg border border-white/20">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="font-label text-[10px] text-white/60 uppercase">Recent Match</span>
+                    <span class="text-secondary-container font-label text-[10px] font-bold">98% Fit</span>
+                </div>
+                <div class="text-white font-headline font-bold text-sm">DoD Infrastructure Modernization - Phase IV</div>
+            </div>
+        </div>
+        <div class="absolute -top-12 -right-12 w-64 h-64 bg-secondary/10 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-12 -left-12 w-48 h-48 bg-on-tertiary-container/20 rounded-full blur-3xl"></div>
+    </div>
+</div>
 </section>
 
-<div class="contador-section" style="background:var(--navy);padding:2.5rem 2rem;text-align:center">
-    <p class="reveal" style="color:rgba(255,255,255,0.6);font-size:0.82rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:0.5rem">Licitações publicadas hoje no PNCP</p>
-    <div class="animated-divider reveal"></div>
-    <p id="contador" style="font-family:'DM Serif Display',serif;font-size:3.5rem;color:var(--gold);line-height:1;font-weight:400">{{ total_hoje }}</p>
-    <p class="reveal reveal-delay-1" style="color:rgba(255,255,255,0.5);font-size:0.82rem;margin-top:0.75rem">oportunidades monitoradas automaticamente</p>
+<!-- Trust Bar / Counter -->
+<section class="py-12 bg-surface-container-low border-y border-outline-variant/10">
+<div class="max-w-7xl mx-auto px-6 text-center">
+    <p class="reveal font-label text-xs uppercase tracking-[0.2em] text-on-surface-variant mb-4">Active Contracts on SAM.gov Right Now</p>
+    <p id="contador" class="font-headline text-5xl font-black tracking-tighter text-secondary">{{ total_hoje }}</p>
+    <p class="reveal reveal-delay-1 font-label text-xs text-on-surface-variant mt-2 uppercase tracking-wider">opportunities monitored automatically</p>
 </div>
+</section>
 
-<div style="background:var(--white);border-top:1px solid var(--gray-100);border-bottom:1px solid var(--gray-100)">
-    <div class="section" style="padding:5rem 2rem">
-        <h2 class="section-title reveal">Como funciona</h2>
-        <p class="section-subtitle reveal reveal-delay-1">Em menos de 2 minutos você está recebendo alertas.</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:2rem;margin-top:2rem">
-            <div class="step-card reveal reveal-delay-1" style="text-align:center;padding:2rem">
-                <div class="step-number" style="width:56px;height:56px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-family:'DM Serif Display',serif;font-size:1.4rem;color:var(--gold)">1</div>
-                <h3 style="font-family:'DM Serif Display',serif;font-size:1.2rem;color:var(--navy);margin-bottom:0.75rem">Crie sua conta</h3>
-                <p style="color:var(--gray-500);font-size:0.9rem;line-height:1.6">Cadastre seu nome, e-mail e defina as palavras-chave do seu setor. Leva menos de 2 minutos.</p>
+<!-- How it Works -->
+<section class="py-24 bg-surface" id="how">
+<div class="max-w-7xl mx-auto px-6">
+    <div class="max-w-3xl mb-16 reveal">
+        <h2 class="font-headline text-4xl font-extrabold tracking-tight mb-4">Precision Procurement.</h2>
+        <p class="text-on-surface-variant text-lg">Our systematic approach eliminates the noise of the public sector, delivering only the contracts that align with your capabilities.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+        <div class="group reveal reveal-delay-1">
+            <div class="w-16 h-16 bg-surface-container-high rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-white transition-all">
+                <span class="material-symbols-outlined text-3xl">radar</span>
             </div>
-            <div class="step-card reveal reveal-delay-2" style="text-align:center;padding:2rem">
-                <div class="step-number" style="width:56px;height:56px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-family:'DM Serif Display',serif;font-size:1.4rem;color:var(--gold)">2</div>
-                <h3 style="font-family:'DM Serif Display',serif;font-size:1.2rem;color:var(--navy);margin-bottom:0.75rem">Monitoramos por você</h3>
-                <p style="color:var(--gray-500);font-size:0.9rem;line-height:1.6">Todo dia às 9h varremos o Portal Nacional de Contratações Públicas em busca de oportunidades para o seu negócio.</p>
-            </div>
-            <div class="step-card reveal reveal-delay-3" style="text-align:center;padding:2rem">
-                <div class="step-number" style="width:56px;height:56px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-family:'DM Serif Display',serif;font-size:1.4rem;color:var(--gold)">3</div>
-                <h3 style="font-family:'DM Serif Display',serif;font-size:1.2rem;color:var(--navy);margin-bottom:0.75rem">Receba os alertas</h3>
-                <p style="color:var(--gray-500);font-size:0.9rem;line-height:1.6">Você recebe um e-mail com todas as licitações relevantes do dia, prontas para você analisar e participar.</p>
-            </div>
+            <div class="font-label text-secondary font-bold text-sm mb-2">01. MONITOR</div>
+            <h3 class="font-headline text-2xl font-bold mb-3">Real-Time Scanning</h3>
+            <p class="text-on-surface-variant">Continuous aggregation from SAM.gov. We see the RFPs the moment they drop and match them against your profile.</p>
         </div>
-        <div class="reveal reveal-delay-2" style="text-align:center;margin-top:2.5rem">
-            <a href="/cadastro" class="btn btn-primary">Comece agora — é grátis</a>
+        <div class="group reveal reveal-delay-2">
+            <div class="w-16 h-16 bg-surface-container-high rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-white transition-all">
+                <span class="material-symbols-outlined text-3xl">analytics</span>
+            </div>
+            <div class="font-label text-secondary font-bold text-sm mb-2">02. ANALYZE</div>
+            <h3 class="font-headline text-2xl font-bold mb-3">Smart Scorecarding</h3>
+            <p class="text-on-surface-variant">Every contract is scored 0–10 based on your keywords, NAICS codes, set-aside eligibility, and contract value.</p>
+        </div>
+        <div class="group reveal reveal-delay-3">
+            <div class="w-16 h-16 bg-surface-container-high rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-white transition-all">
+                <span class="material-symbols-outlined text-3xl">trophy</span>
+            </div>
+            <div class="font-label text-secondary font-bold text-sm mb-2">03. WIN</div>
+            <h3 class="font-headline text-2xl font-bold mb-3">Act Fast</h3>
+            <p class="text-on-surface-variant">Receive instant email alerts with the highest-scored opportunities so you can focus your bid resources where it counts.</p>
         </div>
     </div>
 </div>
+</section>
 
-<div class="section" id="planos" style="padding-top:5rem">
-    <h2 class="section-title reveal">Planos e Preços</h2>
-    <p class="section-subtitle reveal reveal-delay-1">7 dias grátis em todos os planos. Cancele quando quiser.</p>
-
-    <div class="reveal reveal-delay-2" style="display:flex;align-items:center;justify-content:center;gap:1rem;margin-bottom:2.5rem">
-        <span id="label-mensal" style="font-weight:600;color:var(--navy);font-size:0.95rem">Mensal</span>
-        <div onclick="togglePeriodo()" style="width:52px;height:28px;background:var(--blue);border-radius:20px;cursor:pointer;position:relative;">
-            <div id="toggle-ball" style="width:22px;height:22px;background:white;border-radius:50%;position:absolute;top:3px;left:3px;"></div>
+<!-- Bento Features -->
+<section class="py-24 bg-surface-container-low">
+<div class="max-w-7xl mx-auto px-6">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Large card -->
+        <div class="lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 flex flex-col justify-between overflow-hidden relative border border-outline-variant/10 group reveal">
+            <div class="relative z-10 max-w-md">
+                <div class="inline-block px-3 py-1 bg-on-tertiary-container/10 rounded-full mb-4">
+                    <span class="font-label text-[10px] text-on-tertiary-container font-bold uppercase tracking-wider">NAICS + Set-Aside Matching</span>
+                </div>
+                <h3 class="font-headline text-3xl font-bold mb-4">Intelligent Opportunity Scoring</h3>
+                <p class="text-on-surface-variant mb-6">Our engine scores every contract against your business profile — NAICS codes, set-aside eligibility (SBA, SDVOSB, WOSB, 8a, HUBZone), and contract value — so you always know which opportunities to prioritize.</p>
+            </div>
+            <div class="lg:absolute lg:bottom-0 lg:right-0 w-full lg:w-1/2 p-4 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+                <div class="bg-surface p-4 rounded-t-xl shadow-lg border-x border-t border-outline-variant/10">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="font-label text-[10px] text-on-surface-variant">Relevance Score</span>
+                        <span class="text-secondary font-bold font-label">9 / 10</span>
+                    </div>
+                    <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+                        <div class="h-full bg-secondary w-[90%]"></div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-3 gap-2 text-[10px] font-label text-on-surface-variant">
+                        <div class="bg-surface-container-high rounded p-2 text-center">NAICS ✓</div>
+                        <div class="bg-surface-container-high rounded p-2 text-center">SDVOSB ✓</div>
+                        <div class="bg-secondary/20 rounded p-2 text-center">Keywords ✓</div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <span id="label-anual" style="font-weight:400;color:var(--gray-500);font-size:0.95rem">
-            Anual <span style="background:var(--gold);color:var(--navy);font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:20px;margin-left:0.25rem">17% de desconto</span>
-        </span>
-    </div>
-
-    <div class="plans-grid">
-
-        <!-- BÁSICO -->
-        <div class="plan-card reveal reveal-delay-1">
-            <p class="plan-name">Básico</p>
-            <p class="plan-price">
-                <span class="preco-mensal">R$ 49<span style="font-size:1rem;font-weight:400;color:var(--gray-500)">/mês</span></span>
-                <span class="preco-anual" style="display:none">R$ 490<span style="font-size:1rem;font-weight:400;color:var(--gray-500)">/ano</span></span>
-            </p>
-            <p class="preco-detalhe-anual" style="display:none;font-size:0.82rem;color:var(--gray-500);margin-bottom:0.5rem">R$ 41/mês — economia de R$ 98</p>
-            <ul class="plan-features">
-                <li>5 palavras-chave monitoradas</li>
-                <li>Alertas diários por e-mail</li>
-                <li>Score de oportunidade (0–10)</li>
-                <li>Busca manual quando quiser</li>
-                <li>Filtro por valor e estado</li>
-                <li>Acesso ao dashboard</li>
-            </ul>
-            <a href="#" onclick="assinar('basico')" class="btn btn-primary btn-block">7 dias grátis</a>
+        <!-- Small card 1 -->
+        <div class="lg:col-span-4 bg-primary text-white rounded-xl p-8 flex flex-col justify-between border border-primary-container reveal reveal-delay-1">
+            <div>
+                <span class="material-symbols-outlined text-4xl mb-6 text-secondary-container">notifications_active</span>
+                <h3 class="font-headline text-2xl font-bold mb-4">Real-time Alerts</h3>
+                <p class="text-on-primary-container text-sm">Custom email alerts the second a matching contract is posted on SAM.gov — scored and ready to review.</p>
+            </div>
+            <div class="mt-8 pt-6 border-t border-white/10 flex items-center justify-between">
+                <span class="font-label text-xs uppercase text-white/40">Daily digest</span>
+                <span class="font-label text-xs text-secondary-container">9:00 AM EST</span>
+            </div>
         </div>
-
-        <!-- PROFISSIONAL -->
-        <div class="plan-card featured reveal reveal-delay-2">
-            <div class="plan-badge">Mais popular</div>
-            <p class="plan-name">Profissional</p>
-            <p class="plan-price">
-                <span class="preco-mensal">R$ 147<span style="font-size:1rem;font-weight:400;color:var(--gray-500)">/mês</span></span>
-                <span class="preco-anual" style="display:none">R$ 1.470<span style="font-size:1rem;font-weight:400;color:var(--gray-500)">/ano</span></span>
-            </p>
-            <p class="preco-detalhe-anual" style="display:none;font-size:0.82rem;color:var(--gray-500);margin-bottom:0.5rem">R$ 122/mês — economia de R$ 294</p>
-            <ul class="plan-features">
-                <li>20 palavras-chave monitoradas</li>
-                <li>Alertas diários por e-mail</li>
-                <li>Relatório semanal de oportunidades</li>
-                <li>
-                    Score de oportunidade (0–10)
-                    <span class="score-info">Cada licitação recebe uma nota automática de relevância com base nas suas palavras-chave e valor do contrato — facilitando priorizar o que importa.</span>
-                </li>
-                <li>Busca manual quando quiser</li>
-                <li>Acesso ao dashboard</li>
-            </ul>
-            <a href="#" onclick="assinar('profissional')" class="btn btn-gold btn-block">7 dias grátis</a>
+        <!-- Small card 2 -->
+        <div class="lg:col-span-4 bg-surface-container-high rounded-xl p-8 flex flex-col justify-between group reveal reveal-delay-2">
+            <div>
+                <span class="material-symbols-outlined text-4xl mb-6 text-primary">manage_search</span>
+                <h3 class="font-headline text-2xl font-bold mb-4">Set-Aside Intelligence</h3>
+                <p class="text-on-surface-variant text-sm">Tell us your certifications — SBA, 8(a), HUBZone, WOSB, SDVOSB — and we'll surface contracts set aside for you first.</p>
+            </div>
+            <div class="mt-8 space-y-2">
+                <div class="h-1 bg-primary/10 w-full rounded-full overflow-hidden"><div class="h-full bg-primary/40 w-[70%]"></div></div>
+                <div class="h-1 bg-primary/10 w-full rounded-full overflow-hidden"><div class="h-full bg-primary/40 w-[50%]"></div></div>
+            </div>
         </div>
-
-        <!-- AGÊNCIA — EM BREVE -->
-        <div class="plan-card disabled reveal reveal-delay-3">
-            <div class="plan-badge" style="background:var(--gray-500)">Em breve</div>
-            <p class="plan-name" style="color:var(--gray-500)">Agência</p>
-            <p class="plan-price" style="color:var(--gray-500)">
-                <span class="preco-mensal">R$ 297<span style="font-size:1rem;font-weight:400;color:var(--gray-300)">/mês</span></span>
-                <span class="preco-anual" style="display:none">R$ 2.970<span style="font-size:1rem;font-weight:400;color:var(--gray-300)">/ano</span></span>
-            </p>
-            <p class="preco-detalhe-anual" style="display:none;font-size:0.82rem;color:var(--gray-300);margin-bottom:0.5rem">R$ 248/mês — economia de R$ 594</p>
-            <ul class="plan-features">
-                <li>Palavras-chave ilimitadas</li>
-                <li>Tudo do plano Profissional</li>
-                <li>Gestão multi-cliente</li>
-                <li>Histórico completo</li>
-                <li>Busca manual quando quiser</li>
-            </ul>
-            <button class="btn btn-primary btn-block" disabled style="opacity:0.4;cursor:not-allowed;">Em breve</button>
+        <!-- Large card 2 -->
+        <div class="lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 flex flex-col lg:flex-row gap-8 border border-outline-variant/10 reveal reveal-delay-1">
+            <div class="flex-1">
+                <span class="material-symbols-outlined text-4xl mb-6 text-secondary">gavel</span>
+                <h3 class="font-headline text-3xl font-bold mb-4">NAICS Code Matching</h3>
+                <p class="text-on-surface-variant">Register your NAICS codes and get exact, industry-group, and sector-level matches. Contracts in your exact classification score 3x higher.</p>
+            </div>
+            <div class="flex-1 bg-surface rounded-lg p-6 flex flex-col justify-center">
+                <div class="space-y-4">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-secondary text-xl">check_circle</span>
+                        <span class="text-sm font-medium font-label">NAICS 541512 Exact Match</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-secondary text-xl">check_circle</span>
+                        <span class="text-sm font-medium font-label">SDVOSB Set-Aside Eligible</span>
+                    </div>
+                    <div class="flex items-center gap-3 opacity-40">
+                        <span class="material-symbols-outlined text-xl">circle</span>
+                        <span class="text-sm font-medium font-label">Past Performance (coming soon)</span>
+                    </div>
+                </div>
+            </div>
         </div>
-
     </div>
 </div>
+</section>
 
-<div id="newsletter" style="background:#0f1f3d;padding:4rem 2rem;text-align:center">
-    <h2 class="reveal" style="color:white;font-family:Georgia,serif;font-size:1.4rem;margin-bottom:0.5rem">
-        Radar Semanal de Licitações — <span style="color:#d4af37">grátis</span>
-    </h2>
-    <p class="reveal reveal-delay-1" style="color:rgba(255,255,255,0.6);font-size:0.9rem;margin-bottom:1.5rem">
-        Toda segunda às 9h, as melhores oportunidades da semana no seu e-mail.
-    </p>
-    <form method="POST" action="/newsletter/cadastro" class="reveal reveal-delay-2" style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto">
+<!-- Pricing -->
+<section class="py-24 bg-surface" id="planos">
+<div class="max-w-7xl mx-auto px-6">
+    <div class="text-center mb-16 reveal">
+        <h2 class="font-headline text-4xl font-extrabold tracking-tight mb-4">Flexible Intelligence Packages.</h2>
+        <p class="text-on-surface-variant max-w-2xl mx-auto">7-day free trial on all plans. Cancel anytime.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Basic -->
+        <div class="bg-surface-container-low rounded-xl p-8 border border-transparent hover:border-outline-variant/30 transition-all reveal reveal-delay-1">
+            <div class="font-label text-xs uppercase font-bold text-on-surface-variant mb-2">Basic</div>
+            <div class="mb-6"><span class="font-headline text-4xl font-black">$49</span><span class="text-on-surface-variant font-label text-sm">/mo</span></div>
+            <p class="text-sm text-on-surface-variant mb-8">Ideal for small businesses entering federal contracting.</p>
+            <ul class="space-y-4 mb-8">
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>5 keywords monitored</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>Daily email alerts</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>Opportunity score (0–10)</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>NAICS + set-aside matching</li>
+            </ul>
+            <button onclick="assinar('basico')" class="w-full py-3 bg-white border border-outline-variant text-primary font-headline font-bold rounded hover:bg-surface-container-high transition-colors">Start Free Trial</button>
+        </div>
+        <!-- Professional -->
+        <div class="bg-primary text-white rounded-xl p-8 shadow-2xl relative overflow-hidden transform scale-105 z-10 reveal reveal-delay-2">
+            <div class="absolute top-0 right-0 bg-secondary text-white font-label text-[10px] font-bold py-1 px-4 rounded-bl-lg">MOST POPULAR</div>
+            <div class="font-label text-xs uppercase font-bold text-on-primary-container mb-2">Professional</div>
+            <div class="mb-6"><span class="font-headline text-4xl font-black">$149</span><span class="text-on-primary-container font-label text-sm">/mo</span></div>
+            <p class="text-sm text-on-primary-container mb-8">For growing contractors pursuing national-scale opportunities.</p>
+            <ul class="space-y-4 mb-8">
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-secondary-container text-lg">check</span>20 keywords monitored</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-secondary-container text-lg">check</span>Daily email alerts</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-secondary-container text-lg">check</span>Weekly opportunity report</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-secondary-container text-lg">check</span>AI opportunity scoring</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-secondary-container text-lg">check</span>Manual search on demand</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-secondary-container text-lg">check</span>CSV export</li>
+            </ul>
+            <button onclick="assinar('profissional')" class="w-full py-3 bg-secondary text-white font-headline font-bold rounded shadow-lg hover:bg-secondary-container transition-colors">Start Free Trial</button>
+        </div>
+        <!-- Agency -->
+        <div class="bg-surface-container-low rounded-xl p-8 border border-transparent hover:border-outline-variant/30 transition-all reveal reveal-delay-3">
+            <div class="font-label text-xs uppercase font-bold text-on-surface-variant mb-2">Agency</div>
+            <div class="mb-6"><span class="font-headline text-4xl font-black">$299</span><span class="text-on-surface-variant font-label text-sm">/mo</span></div>
+            <p class="text-sm text-on-surface-variant mb-8">Full-suite intelligence for primes and consulting firms.</p>
+            <ul class="space-y-4 mb-8">
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>Unlimited keywords</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>Everything in Professional</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>Multi-client management</li>
+                <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>Full history</li>
+            </ul>
+            <button onclick="assinar('agencia')" class="w-full py-3 bg-white border border-outline-variant text-primary font-headline font-bold rounded hover:bg-surface-container-high transition-colors">Start Free Trial</button>
+        </div>
+    </div>
+</div>
+</section>
+
+<!-- Testimonials -->
+<section class="py-24 bg-surface-container-low">
+<div class="max-w-7xl mx-auto px-6">
+    <h2 class="font-headline text-center text-3xl font-black mb-16 tracking-tight reveal">Contractor Feedback.</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+        <div class="bg-white p-10 rounded-xl relative shadow-sm border border-outline-variant/5 reveal reveal-delay-1">
+            <div class="absolute -top-4 -left-4 text-6xl text-secondary-container opacity-20 font-headline">"</div>
+            <p class="font-body text-xl italic text-on-surface mb-8">"TenderSentinel shortened our capture cycle by 40%. The NAICS scoring caught a subcontracting requirement in a $20M Navy contract we would have scrolled past."</p>
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-surface-container-highest overflow-hidden">
+                    <img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCgK3SeXfmWuGDpvssgQEHU_GwVpylJV1ZJlsRstd3kz8xTWP3W0RHHV8P3sgwjjkTzlNXdeSCBI-5Ek3rI8KA0TxPGPnTYaXS6s46XH3Tcq_AWZSaeJMd7Qy6nBesjHStF2TK9cE0xumKhzF9Pl5celTgI5fRiD9gB84Eu5Si8Cyr2On7gulEsntSrtAJLwf2oOL-EGS2pseIpF9evX2atD88BwZY2BD4R_1bhY24lTPOuI6t7Wc2mJ2kk_gVRG-16i7A5HnUWIU" alt="Marcus Chen"/>
+                </div>
+                <div>
+                    <div class="font-headline font-bold text-sm">Marcus Chen</div>
+                    <div class="font-label text-xs text-on-surface-variant">Director of Business Dev, AeroSystems</div>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white p-10 rounded-xl relative shadow-sm border border-outline-variant/5 reveal reveal-delay-2">
+            <div class="absolute -top-4 -left-4 text-6xl text-secondary-container opacity-20 font-headline">"</div>
+            <p class="font-body text-xl italic text-on-surface mb-8">"Finally, a procurement tool that doesn't feel like it was built in 1995. The set-aside matching is exactly what our SDVOSB needed to find the right opportunities fast."</p>
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-surface-container-highest overflow-hidden">
+                    <img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNo_iQ4hjxrif_ReVc9uTtj7qB8ErMRD_iSeaSM9rCmdyxQz4r_YyNhSxuUy_PviKS07PkQMGII7IR6PCP8WaGY6-5gUZNsMdf9OvZzpWVJDlVOavMJmlT6EFjkK8Jfu1FNNWxGxjsEJ7uHqtYwVKBv7U3t3xbdk4JylOICnA96m90_cBiIbvuwusr3lzCBaKTk_wYi56bwTCKEldO9cVQ4TNu0RzoPclAbEk-ehGvQlEVK1FKZTZ9krq0VyOYWIPn9a7vD3oYXJQ" alt="Sarah Jenkins"/>
+                </div>
+                <div>
+                    <div class="font-headline font-bold text-sm">Sarah Jenkins</div>
+                    <div class="font-label text-xs text-on-surface-variant">CEO, GovSecure Solutions</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</section>
+
+<!-- Newsletter / CTA -->
+<section class="py-24 bg-primary text-white" id="newsletter">
+<div class="max-w-4xl mx-auto px-6 text-center">
+    <h2 class="font-headline text-4xl md:text-5xl font-black mb-6 tracking-tighter reveal">Weekly Contract Digest — <span class="text-secondary-container">free</span></h2>
+    <p class="text-on-primary-container text-lg mb-10 reveal reveal-delay-1">Every Monday at 9am, the best federal opportunities of the week delivered to your inbox.</p>
+    <form method="POST" action="/newsletter/cadastro" class="reveal reveal-delay-2 flex flex-col sm:flex-row gap-4 justify-center max-w-xl mx-auto">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="text" name="nome" placeholder="Seu nome" required class="newsletter-input"
-            style="flex:1;min-width:150px;padding:0.75rem 1rem;border-radius:8px;border:2px solid transparent;font-size:0.9rem">
-        <input type="email" name="email" placeholder="Seu e-mail" required class="newsletter-input"
-            style="flex:2;min-width:200px;padding:0.75rem 1rem;border-radius:8px;border:2px solid transparent;font-size:0.9rem">
-        <button type="submit" class="btn"
-            style="background:#d4af37;color:#0f1f3d;padding:0.75rem 1.5rem;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:0.9rem">
-            Quero receber
-        </button>
+        <input type="text" name="nome" placeholder="Your name" required
+            class="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-secondary-container font-body">
+        <input type="email" name="email" placeholder="Your email" required
+            class="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-secondary-container font-body">
+        <button type="submit" class="px-6 py-3 bg-secondary text-white font-headline font-bold rounded-lg hover:bg-secondary-container transition-all whitespace-nowrap">Subscribe</button>
     </form>
 </div>
+</section>
 
-<footer>
-    <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
+<!-- Footer -->
+<footer class="bg-slate-950 text-white w-full py-12 px-6 border-t border-slate-800">
+<div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
+    <div class="md:col-span-1">
+        <div class="text-lg font-bold text-orange-500 mb-4 font-headline">TenderSentinel</div>
+        <p class="font-body text-sm font-light text-slate-400 leading-relaxed">AI-powered market intelligence for US federal procurement. Empowering businesses to win government contracts.</p>
+    </div>
+    <div>
+        <h4 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-white/40">Product</h4>
+        <ul class="space-y-4 font-body text-sm font-light">
+            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="#how">How it Works</a></li>
+            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="#planos">Pricing</a></li>
+            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/dashboard">Dashboard</a></li>
+        </ul>
+    </div>
+    <div>
+        <h4 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-white/40">Account</h4>
+        <ul class="space-y-4 font-body text-sm font-light">
+            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/cadastro">Create Account</a></li>
+            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/login">Sign In</a></li>
+            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/minha-conta">My Account</a></li>
+        </ul>
+    </div>
+    <div>
+        <h4 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-white/40">Contact</h4>
+        <ul class="space-y-4 font-body text-sm font-light">
+            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="#newsletter">Newsletter</a></li>
+        </ul>
+    </div>
+</div>
+<div class="max-w-7xl mx-auto mt-16 pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+    <p class="font-body text-sm font-light text-slate-500">© 2026 TenderSentinel. US Federal Procurement Intelligence. All rights reserved.</p>
+</div>
 </footer>
 
 <script>
-    document.querySelectorAll('a[href^="#"]').forEach(a => {
-        a.addEventListener('click', e => {
-            const target = document.querySelector(a.getAttribute('href'));
-            if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-        });
-    });
-
-    const nav = document.querySelector('nav');
-    window.addEventListener('scroll', () => { nav.classList.toggle('scrolled', window.scrollY > 40); }, { passive: true });
-
-    const hero = document.getElementById('hero');
-    window.addEventListener('scroll', () => {
-        const y = window.scrollY;
-        if (y < window.innerHeight) { hero.style.transform = `translateY(${y * 0.25}px)`; hero.style.opacity = 1 - (y / window.innerHeight) * 0.6; }
-    }, { passive: true });
-
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('visible'); observer.unobserve(entry.target); } });
-    }, { threshold: 0.12 });
-    document.querySelectorAll('.reveal, .animated-divider').forEach(el => observer.observe(el));
-
-    window.addEventListener('load', () => {
-        document.querySelectorAll('.reveal').forEach(el => {
-            const rect = el.getBoundingClientRect();
-            if (rect.top < window.innerHeight) { el.classList.add('visible'); }
-        });
-    });
-
-    const contadorEl = document.getElementById('contador');
-    async function atualizarContador() {
-        try {
-            const r = await fetch('/api/contador');
-            const data = await r.json();
-            const novo = data.total.toLocaleString('pt-BR');
-            if (contadorEl.textContent !== novo) {
-                contadorEl.classList.add('bump');
-                setTimeout(() => contadorEl.classList.remove('bump'), 350);
-                contadorEl.textContent = novo;
-            }
-        } catch (e) {}
-    }
-    atualizarContador();
-    setInterval(atualizarContador, 5 * 60 * 1000);
-
-    let periodoAtual = 'mensal';
-    function togglePeriodo() {
-        periodoAtual = periodoAtual === 'mensal' ? 'anual' : 'mensal';
-        const ball = document.getElementById('toggle-ball');
-        const labelMensal = document.getElementById('label-mensal');
-        const labelAnual = document.getElementById('label-anual');
-        if (periodoAtual === 'anual') {
-            ball.style.left = '27px';
-            labelMensal.style.fontWeight = '400'; labelMensal.style.color = 'var(--gray-500)';
-            labelAnual.style.fontWeight = '600'; labelAnual.style.color = 'var(--navy)';
-        } else {
-            ball.style.left = '3px';
-            labelMensal.style.fontWeight = '600'; labelMensal.style.color = 'var(--navy)';
-            labelAnual.style.fontWeight = '400'; labelAnual.style.color = 'var(--gray-500)';
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
         }
-        document.querySelectorAll('.preco-mensal').forEach(el => { el.style.display = periodoAtual === 'mensal' ? '' : 'none'; });
-        document.querySelectorAll('.preco-anual').forEach(el => { el.style.display = periodoAtual === 'anual' ? '' : 'none'; });
-        document.querySelectorAll('.preco-detalhe-anual').forEach(el => { el.style.display = periodoAtual === 'anual' ? '' : 'none'; });
-    }
+    });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
-    function assinar(plano) {
-    {% if current_user.is_authenticated %}
-        window.location.href = `/assinar/${plano}?periodo=${periodoAtual}`;
-    {% else %}
-        window.location.href = `/cadastro?plano=${plano}&periodo=${periodoAtual}`;
-    {% endif %}
-    }
+// Run on load for elements already in view
+window.addEventListener('load', () => {
+    document.querySelectorAll('.reveal').forEach(el => {
+        if (el.getBoundingClientRect().top < window.innerHeight) {
+            el.classList.add('visible');
+        }
+    });
+});
+
+// Smooth anchor scroll
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    });
+});
+
+// Counter
+const contadorEl = document.getElementById('contador');
+async function updateCounter() {
+    try {
+        const r = await fetch('/api/contador');
+        const data = await r.json();
+        const novo = data.total.toLocaleString('en-US');
+        if (contadorEl.textContent.trim() !== novo) {
+            contadorEl.classList.add('bump');
+            setTimeout(() => contadorEl.classList.remove('bump'), 350);
+            contadorEl.textContent = novo;
+        }
+    } catch(e) {}
+}
+updateCounter();
+setInterval(updateCounter, 5 * 60 * 1000);
+
+// Plan subscription
+function assinar(plano) {
+{% if current_user.is_authenticated %}
+    window.location.href = `/assinar/${plano}`;
+{% else %}
+    window.location.href = `/cadastro`;
+{% endif %}
+}
 </script>
 </body>
 </html>

@@ -1,110 +1,177 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html class="light" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard — LicitaBot</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .score-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            padding: 0.25rem 0.6rem;
-            border-radius: 20px;
-            font-size: 0.78rem;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-        .score-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-        }
-        .score-alta  { background: #dcfce7; color: #15803d; }
-        .score-media { background: #fef3c7; color: #b45309; }
-        .score-baixa { background: #f1f5f9; color: #64748b; }
-    </style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dashboard — TenderSentinel</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&family=Work+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+    theme: {
+        extend: {
+            colors: {
+                "surface": "#f8f9ff",
+                "surface-container-low": "#eff4ff",
+                "surface-container": "#e5eeff",
+                "surface-container-high": "#dce9ff",
+                "surface-container-highest": "#d3e4fe",
+                "surface-container-lowest": "#ffffff",
+                "on-surface": "#0b1c30",
+                "on-surface-variant": "#45464d",
+                "outline-variant": "#c6c6cd",
+                "primary": "#000000",
+                "primary-container": "#131b2e",
+                "on-primary-container": "#7c839b",
+                "secondary": "#9f4200",
+                "secondary-container": "#fc7218",
+                "on-secondary-container": "#592200",
+                "on-tertiary-container": "#008cc7",
+                "tertiary-container": "#001e2f",
+            },
+            fontFamily: {
+                "headline": ["Inter"],
+                "body": ["Work Sans"],
+                "label": ["Space Grotesk"]
+            },
+        },
+    },
+}
+</script>
+<style>
+    .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        vertical-align: middle;
+    }
+    .pulse-dot {
+        width: 7px; height: 7px;
+        background-color: #9f4200;
+        border-radius: 50%;
+        display: inline-block;
+        position: relative;
+    }
+    .pulse-dot::after {
+        content: '';
+        position: absolute;
+        width: 100%; height: 100%;
+        top: 0; left: 0;
+        background-color: #9f4200;
+        border-radius: 50%;
+        z-index: -1;
+        opacity: 0.7;
+        animation: ripple 2s infinite ease-out;
+    }
+    @keyframes ripple {
+        0%   { transform: scale(1); opacity: 0.7; }
+        100% { transform: scale(3); opacity: 0; }
+    }
+</style>
 </head>
-<body>
+<body class="bg-surface text-on-surface font-body min-h-screen">
 
-<nav>
-    <a href="/" class="nav-logo">Licita<span>Bot</span></a>
-    <div class="nav-links">
-        <span style="color:rgba(255,255,255,0.6);font-size:0.9rem">{{ cliente.nome }}</span>
-        <a href="/minha-conta">Minha conta</a>
-        <a href="/logout">Sair</a>
+<!-- Nav -->
+<nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm">
+<div class="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
+    <a href="/" class="text-xl font-black tracking-tighter text-slate-950 font-headline">TenderSentinel</a>
+    <div class="flex items-center gap-4">
+        <span class="hidden sm:block font-label text-xs text-on-surface-variant">{{ cliente.nome }}</span>
+        <a href="/minha-conta" class="text-sm font-body text-on-surface-variant hover:text-on-surface transition-colors">Account</a>
+        <a href="/logout" class="px-4 py-2 text-sm font-bold font-headline bg-primary text-white rounded-md">Sign out</a>
     </div>
+</div>
 </nav>
 
-<div class="dashboard">
-    <div class="dashboard-header">
-        <h1 class="dashboard-title">Olá, <span>{{ cliente.nome.split()[0] }}</span>!</h1>
-        <p style="font-size:0.9rem;color:var(--gray-500);margin-top:0.25rem">
-            Plano: <strong style="text-transform:capitalize">{{ cliente.plano or 'Gratuito' }}</strong>
-            ({{ cliente.limite_palavras if cliente.limite_palavras else '∞' }} palavras)
-            — <a href="/gerenciar-assinatura" style="color:var(--blue)">Gerenciar assinatura</a>
+<div class="max-w-7xl mx-auto px-6 pt-24 pb-16">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="pulse-dot"></span>
+            <span class="font-label text-xs uppercase tracking-widest text-on-surface-variant">Live monitoring active</span>
+        </div>
+        <h1 class="font-headline text-3xl font-black tracking-tight">Hello, {{ cliente.nome.split()[0] }}</h1>
+        <p class="text-on-surface-variant font-body text-sm mt-1">
+            Plan: <strong class="text-on-surface capitalize">{{ cliente.plano or 'Free' }}</strong>
+            · {{ cliente.limite_palavras if cliente.limite_palavras else '∞' }} keywords
+            · <a href="/gerenciar-assinatura" class="text-secondary hover:underline">Manage subscription</a>
         </p>
     </div>
 
+    <!-- Upgrade banner -->
     {% if not cliente.plano_pago %}
-    <div style="background:linear-gradient(135deg,var(--navy) 0%,var(--navy-light) 100%);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+    <div class="bg-primary-container rounded-xl p-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-            <p style="color:var(--gold);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem">Você está no plano gratuito</p>
-            <p style="color:rgba(255,255,255,0.75);font-size:0.85rem">Monitore até 1 palavra-chave. Assine um plano para monitorar mais, usar busca manual e acessar filtros avançados.</p>
+            <p class="font-headline font-bold text-secondary-container text-sm mb-1">You're on the free plan</p>
+            <p class="text-on-primary-container text-sm font-body">Monitor up to 1 keyword. Upgrade to unlock more keywords, manual search, scoring, and advanced filters.</p>
         </div>
-        <a href="/#planos" class="btn btn-gold" style="white-space:nowrap;padding:0.6rem 1.5rem;font-size:0.875rem">Ver planos</a>
+        <a href="/#planos" class="shrink-0 px-5 py-2.5 bg-secondary text-white font-headline font-bold text-sm rounded-lg hover:bg-secondary-container transition-colors">View plans</a>
     </div>
     {% endif %}
 
-    <div class="keywords-bar">
-        <span class="keywords-label">Monitorando</span>
+    <!-- Profile bar -->
+    <div class="bg-surface-container-low rounded-xl p-4 mb-6 flex flex-wrap items-center gap-3">
+        <span class="font-label text-xs uppercase tracking-wider text-on-surface-variant">Monitoring</span>
         {% for palavra in cliente.palavras_chave %}
-            <span class="keyword-tag">{{ palavra }}</span>
+            <span class="bg-surface-container-high font-label text-xs font-bold px-3 py-1 rounded-full text-on-surface">{{ palavra }}</span>
         {% endfor %}
-        <a href="/editar-palavras" style="margin-left:auto;font-size:0.82rem;color:var(--blue);text-decoration:none;font-weight:500">Editar</a>
+        {% for code in cliente.naics_codes %}
+            <span class="bg-blue-50 text-blue-700 font-label text-xs font-bold px-3 py-1 rounded-full">NAICS {{ code }}</span>
+        {% endfor %}
+        {% for sa in cliente.set_asides %}
+            <span class="bg-green-50 text-green-700 font-label text-xs font-bold px-3 py-1 rounded-full">{{ sa }}</span>
+        {% endfor %}
+        <div class="ml-auto flex gap-3">
+            <a href="/editar-palavras" class="font-label text-xs font-bold text-secondary hover:underline">Edit keywords</a>
+            <a href="/editar-perfil" class="font-label text-xs font-bold text-secondary hover:underline">Edit profile</a>
+        </div>
     </div>
 
+    <!-- Filters (paid only) -->
     {% if cliente.plano_pago %}
-    <form method="GET" action="/dashboard" class="dashboard-filters">
-        <div class="filter-group">
-            <label for="valor_min">Valor mínimo (R$)</label>
-            <input type="number" id="valor_min" name="valor_min" min="0" step="1000"
-                   value="{{ valor_min }}" placeholder="Ex: 50000">
+    <form method="GET" action="/dashboard" class="bg-surface-container-lowest border border-outline-variant/20 rounded-xl p-4 mb-6 flex flex-wrap items-end gap-4">
+        <div class="flex flex-col gap-1 min-w-[140px]">
+            <label class="font-label text-xs uppercase tracking-wide text-on-surface-variant">Min. value ($)</label>
+            <input type="number" name="valor_min" min="0" step="1000" value="{{ valor_min }}" placeholder="e.g. 50000"
+                class="bg-surface-container text-sm font-body px-3 py-2 rounded-lg border-0 focus:ring-1 focus:ring-secondary outline-none">
         </div>
-        <div class="filter-group">
-            <label for="uf">Estado (UF)</label>
-            <select id="uf" name="uf">
-                <option value="">Todos</option>
-                {% for sigla in ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'] %}
+        <div class="flex flex-col gap-1 min-w-[120px]">
+            <label class="font-label text-xs uppercase tracking-wide text-on-surface-variant">State</label>
+            <select name="uf" class="bg-surface-container text-sm font-body px-3 py-2 rounded-lg border-0 focus:ring-1 focus:ring-secondary outline-none">
+                <option value="">All states</option>
+                {% for sigla in ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'] %}
                 <option value="{{ sigla }}" {% if uf_selecionada == sigla %}selected{% endif %}>{{ sigla }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="btn btn-primary" style="align-self:flex-end;padding:0.55rem 1.25rem;font-size:0.85rem;border:none;cursor:pointer">Filtrar</button>
+        <button type="submit" class="px-4 py-2 bg-primary text-white font-headline font-bold text-sm rounded-lg">Filter</button>
         {% if valor_min or uf_selecionada %}
-        <a href="/dashboard" class="btn btn-secondary" style="align-self:flex-end;padding:0.55rem 1.25rem;font-size:0.85rem">Limpar</a>
+        <a href="/dashboard" class="px-4 py-2 bg-surface-container text-on-surface font-headline font-bold text-sm rounded-lg">Clear</a>
         {% endif %}
     </form>
     {% endif %}
 
-    <div class="table-container">
-        <div class="table-header">
-            <h2>Licitações encontradas</h2>
-            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
-                <span style="font-size:0.82rem;color:var(--gray-500)">Alertas enviados às 9h diariamente</span>
+    <!-- Opportunities table -->
+    <div class="bg-surface-container-lowest rounded-xl border border-outline-variant/10 overflow-hidden">
+        <!-- Table header -->
+        <div class="px-6 py-4 border-b border-outline-variant/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+                <h2 class="font-headline font-bold text-lg">Matching Opportunities</h2>
+                <p class="font-label text-xs text-on-surface-variant mt-0.5">Alerts sent daily at 9am EST</p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
                 {% if cliente.plano_pago %}
-                <form method="POST" action="/buscar-agora" style="display:inline">
+                <form method="POST" action="/buscar-agora">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem;font-size:0.82rem;border:none;cursor:pointer">
-                        Buscar agora
+                    <button type="submit" class="px-4 py-2 bg-secondary text-white font-headline font-bold text-sm rounded-lg hover:bg-secondary-container transition-colors border-0 cursor-pointer">
+                        <span class="material-symbols-outlined text-base mr-1">search</span>Search now
                     </button>
                 </form>
                 {% endif %}
                 {% if cliente.plano in ('profissional', 'agencia') %}
                 <a href="/export-csv{% if valor_min or uf_selecionada %}?valor_min={{ valor_min }}&uf={{ uf_selecionada }}{% endif %}"
-                   class="btn btn-secondary" style="padding:0.5rem 1rem;font-size:0.82rem">
-                    Exportar CSV
+                   class="px-4 py-2 bg-surface-container font-headline font-bold text-sm rounded-lg hover:bg-surface-container-high transition-colors">
+                    <span class="material-symbols-outlined text-base mr-1">download</span>CSV
                 </a>
                 {% endif %}
             </div>
@@ -112,66 +179,87 @@
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }}" style="margin:1rem 0">{{ message }}</div>
+                <div class="mx-6 mt-4 px-4 py-3 rounded-lg text-sm font-body
+                    {% if category == 'sucesso' %}bg-green-50 text-green-800
+                    {% elif category == 'erro' %}bg-red-50 text-red-800
+                    {% else %}bg-blue-50 text-blue-800{% endif %}">
+                    {{ message }}
+                </div>
             {% endfor %}
         {% endwith %}
 
         {% if licitacoes %}
-        <table>
+        <div class="overflow-x-auto">
+        <table class="w-full">
             <thead>
-                <tr>
-                    {% if show_score %}<th>Score</th>{% endif %}
-                    <th>Órgão</th>
-                    <th>Objeto</th>
-                    <th>Valor estimado</th>
-                    <th>Data</th>
-                    <th></th>
+                <tr class="bg-surface-container-low">
+                    {% if show_score %}<th class="text-left px-6 py-3 font-label text-xs uppercase tracking-wider text-on-surface-variant">Score</th>{% endif %}
+                    <th class="text-left px-6 py-3 font-label text-xs uppercase tracking-wider text-on-surface-variant">Agency</th>
+                    <th class="text-left px-6 py-3 font-label text-xs uppercase tracking-wider text-on-surface-variant">Title</th>
+                    <th class="text-left px-6 py-3 font-label text-xs uppercase tracking-wider text-on-surface-variant">Value</th>
+                    <th class="text-left px-6 py-3 font-label text-xs uppercase tracking-wider text-on-surface-variant">Posted</th>
+                    <th class="px-6 py-3"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for l in licitacoes %}
-                <tr>
+                <tr class="border-t border-outline-variant/10 hover:bg-surface-container-low transition-colors">
                     {% if show_score %}
-                    <td>
+                    <td class="px-6 py-4 whitespace-nowrap">
                         {% set score = l[5] %}
                         {% if score >= 8 %}
-                            <span class="score-badge score-alta">
-                                <span class="score-dot" style="background:#16a34a"></span>
-                                {{ score }} Alta
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 text-green-700 font-label text-xs font-bold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>{{ score }} High
                             </span>
                         {% elif score >= 5 %}
-                            <span class="score-badge score-media">
-                                <span class="score-dot" style="background:#d97706"></span>
-                                {{ score }} Média
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 font-label text-xs font-bold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>{{ score }} Medium
                             </span>
                         {% else %}
-                            <span class="score-badge score-baixa">
-                                <span class="score-dot" style="background:#94a3b8"></span>
-                                {{ score }} Baixa
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container text-on-surface-variant font-label text-xs font-bold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block"></span>{{ score }} Low
                             </span>
                         {% endif %}
                     </td>
                     {% endif %}
-                    <td class="td-orgao">{{ l[0] or 'N/A' }}</td>
-                    <td class="td-objeto">{{ l[1] or 'N/A' }}</td>
-                    <td class="td-valor">{{ l[2] | moeda }}</td>
-                    <td style="color:var(--gray-500)">{{ l[3] or '—' }}</td>
-                    <td>{% if l[4] %}<a href="{{ l[4] }}" target="_blank" class="link-ver">Ver</a>{% endif %}</td>
+                    <td class="px-6 py-4 max-w-[180px]">
+                        <p class="font-label text-xs text-on-surface-variant truncate" title="{{ l[0] }}">{{ l[0] or 'N/A' }}</p>
+                    </td>
+                    <td class="px-6 py-4 max-w-xs">
+                        <p class="font-body text-sm text-on-surface line-clamp-2">{{ l[1] or 'N/A' }}</p>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="font-label text-sm font-bold text-on-surface">{{ l[2] | moeda }}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="font-label text-xs text-on-surface-variant">{{ l[3] or '—' }}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if l[4] %}
+                        <a href="{{ l[4] }}" target="_blank"
+                           class="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-white font-label text-xs font-bold rounded-lg hover:opacity-80 transition-opacity">
+                            View <span class="material-symbols-outlined text-sm">open_in_new</span>
+                        </a>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
-        <div class="empty-state">
-            <strong>Nenhuma licitação encontrada ainda.</strong>
-            <p>Os alertas rodam às 9h. Você receberá um e-mail quando surgir uma oportunidade.</p>
+        <div class="px-6 py-16 text-center">
+            <span class="material-symbols-outlined text-5xl text-on-surface-variant/40 block mb-4">inbox</span>
+            <p class="font-headline font-bold text-on-surface mb-2">No opportunities found yet</p>
+            <p class="font-body text-sm text-on-surface-variant">Alerts run daily at 9am EST. You'll receive an email as soon as a matching contract is posted on SAM.gov.</p>
         </div>
         {% endif %}
     </div>
+
 </div>
 
-<footer>
-    <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
+<footer class="border-t border-outline-variant/10 py-6 text-center">
+    <p class="font-label text-xs text-on-surface-variant">© 2026 TenderSentinel — Smart Federal Contract Monitor</p>
 </footer>
 
 </body>

@@ -1,30 +1,30 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar palavras-chave — LicitaBot</title>
+    <title>Edit Keywords — TenderSentinel</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
 <nav>
-    <a href="/" class="nav-logo">Licita<span>Bot</span></a>
+    <a href="/" class="nav-logo">TenderSentinel</a>
     <div class="nav-links">
         <span style="color:rgba(255,255,255,0.6);font-size:0.9rem">{{ cliente.nome }}</span>
-        <a href="/logout">Sair</a>
+        <a href="/logout">Sign out</a>
     </div>
 </nav>
 
 <div class="form-container">
     <div class="form-card">
-        <h1 class="form-title">Editar palavras-chave</h1>
+        <h1 class="form-title">Edit Keywords</h1>
         <p class="form-subtitle">
-            Plano <strong style="text-transform:capitalize">{{ cliente.plano or 'Gratuito' }}</strong> —
+            Plan: <strong style="text-transform:capitalize">{{ cliente.plano or 'Free' }}</strong> —
             {% if cliente.limite_palavras %}
-                até {{ cliente.limite_palavras }} palavras-chave
+                up to {{ cliente.limite_palavras }} keywords
             {% else %}
-                palavras-chave ilimitadas
+                unlimited keywords
             {% endif %}
         </p>
 
@@ -37,37 +37,37 @@
         <form method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
-                <label>Palavras-chave</label>
+                <label>Keywords</label>
                 <input type="text" name="palavras_chave"
                     value="{{ cliente.palavras_chave | join(', ') }}"
-                    placeholder="software, consultoria, TI" required>
+                    placeholder="cybersecurity, IT support, consulting" required>
                 <p class="hint">
-                    Separe por vírgula.
+                    Separate with commas.
                     {% if cliente.limite_palavras %}
-                        Você pode usar até {{ cliente.limite_palavras }} palavras.
+                        You can use up to {{ cliente.limite_palavras }} keywords.
                     {% else %}
-                        Sem limite de palavras.
+                        No keyword limit.
                     {% endif %}
                 </p>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Salvar</button>
+            <button type="submit" class="btn btn-primary btn-block">Save</button>
         </form>
 
         {% if not cliente.plano %}
         <div style="margin-top:1.5rem;padding:1rem;background:var(--gray-100);border-radius:8px;text-align:center">
-            <p style="font-size:0.875rem;color:var(--gray-500);margin-bottom:0.75rem">Quer monitorar mais palavras-chave?</p>
-            <a href="/#planos" class="btn btn-gold" style="padding:0.6rem 1.5rem;font-size:0.875rem">Ver planos</a>
+            <p style="font-size:0.875rem;color:var(--gray-500);margin-bottom:0.75rem">Want to monitor more keywords?</p>
+            <a href="/#planos" class="btn btn-gold" style="padding:0.6rem 1.5rem;font-size:0.875rem">View plans</a>
         </div>
         {% endif %}
 
         <div class="form-footer">
-            <a href="/dashboard">Voltar ao dashboard</a>
+            <a href="/dashboard">Back to dashboard</a>
         </div>
     </div>
 </div>
 
 <footer>
-    <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
+    <p>© 2026 TenderSentinel — Smart Federal Contract Monitor</p>
 </footer>
 
 </body>

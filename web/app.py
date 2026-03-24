@@ -54,12 +54,14 @@ login_manager.login_view = "login"
 
 
 class Cliente(UserMixin):
-    def __init__(self, id, nome, email, palavras_chave, plano=None):
+    def __init__(self, id, nome, email, palavras_chave, plano=None, naics_codes=None, set_asides=None):
         self.id = id
         self.nome = nome
         self.email = email
         self.palavras_chave = palavras_chave or []
         self.plano = plano
+        self.naics_codes = naics_codes or []
+        self.set_asides = set_asides or []
 
     @property
     def limite_palavras(self):
@@ -75,7 +77,7 @@ def load_user(user_id):
     conn = conectar()
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, nome, email, palavras_chave, plano FROM clientes WHERE id = %s",
+        "SELECT id, nome, email, palavras_chave, plano, naics_codes, set_asides FROM clientes WHERE id = %s",
         (user_id,),
     )
     row = cur.fetchone()
@@ -116,7 +118,7 @@ def moeda_filter(valor):
     if not valor:
         return "—"
     try:
-        return f"R$ {float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"${float(valor):,.2f}"
     except Exception:
         return "—"
 
@@ -131,34 +133,15 @@ def contar_licitacoes_hoje():
     if _cache_contador["atualizado_em"] and agora - _cache_contador["atualizado_em"] < timedelta(minutes=5):
         return _cache_contador["total"]
 
-    hoje = date.today().strftime("%Y%m%d")
-    url = "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao"
-    total = 0
-    deadline = time.time() + 8
-
-    for modalidade in [4, 5, 6, 7]:
-        if time.time() > deadline:
-            break
-        pagina = 1
-        while True:
-            if time.time() > deadline:
-                break
-            try:
-                r = requests.get(url, params={
-                    "dataInicial": hoje, "dataFinal": hoje,
-                    "pagina": pagina, "tamanhoPagina": 50,
-                    "codigoModalidadeContratacao": modalidade,
-                }, timeout=4)
-                if r.status_code == 200:
-                    dados = r.json().get("data", [])
-                    total += len(dados)
-                    if len(dados) < 50:
-                        break
-                    pagina += 1
-                else:
-                    break
-            except Exception:
-                break
+    try:
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM licitacoes WHERE data_publicacao = CURRENT_DATE")
+        total = cur.fetchone()[0] or 0
+        cur.close()
+        conn.close()
+    except Exception:
+        total = 0
 
     _cache_contador["total"] = total
     _cache_contador["atualizado_em"] = agora
@@ -203,14 +186,14 @@ def cadastro():
 
         limite_free = limite_palavras(None)
         if len(palavras_lista) > limite_free:
-            flash(f"No plano gratuito você pode cadastrar até {limite_free} palavra-chave. As primeiras foram salvas.", "info")
+            flash(f"The free plan allows up to {limite_free} keyword. The first one was saved.", "info")
             palavras_lista = palavras_lista[:limite_free]
 
         conn = conectar()
         cur = conn.cursor()
         cur.execute("SELECT id FROM clientes WHERE email = %s", (email,))
         if cur.fetchone():
-            flash("E-mail já cadastrado.", "erro")
+            flash("Email already registered.", "erro")
             cur.close()
             conn.close()
             return render_template("cadastro.html")
@@ -223,15 +206,15 @@ def cadastro():
         cur.close()
         conn.close()
 
-        enviar_email(email, "Bem-vindo ao LicitaBot!", f"""
+        enviar_email(email, "Welcome to TenderSentinel!", f"""
         <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-            <h1 style="color:#0f2444">Licita<span style="color:#c9a84c">Bot</span></h1>
-            <h2>Bem-vindo, {html_lib.escape(nome)}!</h2>
-            <p>Seu cadastro foi realizado. Você receberá alertas sobre:
+            <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
+            <h2>Welcome, {html_lib.escape(nome)}!</h2>
+            <p>Your account is ready. You'll receive alerts for:
                <strong>{html_lib.escape(', '.join(palavras_lista))}</strong></p>
         </div>
         """)
-        flash("Cadastro realizado! Verifique seu e-mail.", "sucesso")
+        flash("Account created! Check your email.", "sucesso")
         return redirect(url_for("login"))
 
     return render_template("cadastro.html")
@@ -257,7 +240,7 @@ def login():
             login_user(Cliente(row[0], row[1], row[2], row[3], row[5]), remember=True)
             return redirect(url_for("dashboard"))
 
-        flash("E-mail ou senha incorretos.", "erro")
+        flash("Incorrect email or password.", "erro")
 
     return render_template("login.html")
 
@@ -294,28 +277,15 @@ def dashboard():
 
     conn = conectar()
     cur = conn.cursor()
-    try:
-        cur.execute(f"""
-            SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link
-            FROM licitacoes l
-            WHERE ({filtros_kw})
-              AND (%s IS NULL OR l.valor >= %s)
-              AND (%s IS NULL OR l.uf = %s)
-            ORDER BY l.data_publicacao DESC
-            LIMIT 50
-        """, params_kw + [valor_min, valor_min, uf, uf])
-    except Exception:
-        # Coluna uf pode não existir em instâncias mais antigas — rollback obrigatório
-        conn.rollback()
-        uf = None
-        cur.execute(f"""
-            SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link
-            FROM licitacoes l
-            WHERE ({filtros_kw})
-              AND (%s IS NULL OR l.valor >= %s)
-            ORDER BY l.data_publicacao DESC
-            LIMIT 50
-        """, params_kw + [valor_min, valor_min])
+    cur.execute(f"""
+        SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link, l.naics_code, l.set_aside
+        FROM licitacoes l
+        WHERE ({filtros_kw})
+          AND (%s IS NULL OR l.valor >= %s)
+          AND (%s IS NULL OR l.uf = %s)
+        ORDER BY l.data_publicacao DESC
+        LIMIT 50
+    """, params_kw + [valor_min, valor_min, uf, uf])
 
     rows = cur.fetchall()
     cur.close()
@@ -325,12 +295,18 @@ def dashboard():
         from app.score import calcular_score
         licitacoes = []
         for row in rows:
-            orgao, objeto, valor, data, link = row
-            score = calcular_score(objeto, palavras, valor)
+            orgao, objeto, valor, data, link, naics_code, set_aside = row
+            score = calcular_score(
+                objeto, palavras, valor,
+                naics_code=naics_code,
+                user_naics=current_user.naics_codes,
+                set_aside=set_aside,
+                user_set_asides=current_user.set_asides,
+            )
             licitacoes.append((orgao, objeto, valor, data, link, score))
         licitacoes.sort(key=lambda x: x[5], reverse=True)
     else:
-        licitacoes = list(rows)
+        licitacoes = [row[:5] for row in rows]
 
     return render_template(
         "dashboard.html",
@@ -348,7 +324,7 @@ def dashboard():
 @login_required
 def buscar_agora():
     if not current_user.plano_pago:
-        flash("A busca manual está disponível a partir do plano Básico. Você receberá alertas automaticamente às 9h.", "info")
+        flash("Manual search is available on paid plans. You'll receive automatic alerts at 9am.", "info")
         return redirect(url_for("dashboard"))
 
     cliente_id = current_user.id
@@ -368,7 +344,7 @@ def buscar_agora():
             filtros = " OR ".join(["l.objeto ILIKE %s"] * len(cliente_palavras))
             params = [f"%{p}%" for p in cliente_palavras]
             cur.execute(f"""
-                SELECT l.id, l.pncp_id, l.orgao, l.objeto, l.valor, l.link
+                SELECT l.id, l.sam_id, l.orgao, l.objeto, l.valor, l.link
                 FROM licitacoes l
                 WHERE {filtros}
             """, params)
@@ -387,14 +363,14 @@ def buscar_agora():
                 cards = "".join(_montar_card_licitacao(l[2], l[3], l[4], l[5]) for l in novas)
                 corpo = f"""
                 <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-                    <h1 style="color:#0f2444">Licita<span style="color:#c9a84c">Bot</span></h1>
+                    <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
                     <p style="color:#64748b;margin-bottom:1.5rem">{len(novas)} nova(s) licitação(ões) encontradas!</p>
                     {cards}
                 </div>
                 """
                 enviar_email(
                     cliente_email,
-                    f"LicitaBot — {len(novas)} nova(s) licitação(ões) encontradas!",
+                    f"TenderSentinel — {len(novas)} nova(s) licitação(ões) encontradas!",
                     corpo,
                 )
                 cur.executemany(
@@ -411,7 +387,7 @@ def buscar_agora():
             conn.close()
 
     Thread(target=_rodar, args=(cliente_id, cliente_email, cliente_palavras), daemon=True).start()
-    flash("Busca iniciada! Se encontrarmos algo novo, você receberá um e-mail em instantes.", "info")
+    flash("Search started! If we find new matches, you'll receive an email shortly.", "info")
     return redirect(url_for("dashboard"))
 
 
@@ -446,18 +422,18 @@ def minha_conta():
         row = cur.fetchone()
 
         if not row or not check_password_hash(row[0], senha_atual):
-            flash("Senha atual incorreta.", "erro")
+            flash("Current password is incorrect.", "erro")
         elif len(nova_senha) < 8:
-            flash("A nova senha deve ter pelo menos 8 caracteres.", "erro")
+            flash("New password must be at least 8 characters.", "erro")
         elif nova_senha != confirmar:
-            flash("As senhas não coincidem.", "erro")
+            flash("Passwords do not match.", "erro")
         else:
             cur.execute(
                 "UPDATE clientes SET senha = %s WHERE id = %s",
                 (generate_password_hash(nova_senha), current_user.id),
             )
             conn.commit()
-            flash("Senha alterada com sucesso!", "sucesso")
+            flash("Password updated successfully!", "sucesso")
 
         cur.close()
         conn.close()
@@ -530,7 +506,7 @@ def editar_palavras():
 
         limite = current_user.limite_palavras
         if limite is not None and len(palavras_lista) > limite:
-            flash(f"Seu plano permite até {limite} palavras-chave. As primeiras {limite} foram salvas.", "info")
+            flash(f"Your plan allows up to {limite} keywords. The first {limite} were saved.", "info")
             palavras_lista = palavras_lista[:limite]
 
         conn = conectar()
@@ -539,10 +515,42 @@ def editar_palavras():
         conn.commit()
         cur.close()
         conn.close()
-        flash("Palavras-chave atualizadas com sucesso!", "sucesso")
+        flash("Keywords updated successfully!", "sucesso")
         return redirect(url_for("dashboard"))
 
     return render_template("editar_palavras.html", cliente=current_user)
+
+
+# ── Editar perfil NAICS / set-asides ─────────────────────────────────────────
+
+VALID_SET_ASIDES = {"SBA", "8A", "HZC", "WOSB", "EDWOSB", "SDVOSB", "VSB"}
+
+
+@app.route("/editar-perfil", methods=["GET", "POST"])
+@login_required
+def editar_perfil():
+    if request.method == "POST":
+        naics_raw = request.form.get("naics_codes", "")
+        naics_lista = [c.strip() for c in naics_raw.replace(",", " ").split() if c.strip().isdigit()]
+
+        set_asides_lista = [
+            s for s in request.form.getlist("set_asides")
+            if s.upper() in VALID_SET_ASIDES
+        ]
+
+        conn = conectar()
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE clientes SET naics_codes = %s, set_asides = %s WHERE id = %s",
+            (naics_lista or None, set_asides_lista or None, current_user.id),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash("Profile updated successfully!", "sucesso")
+        return redirect(url_for("dashboard"))
+
+    return render_template("editar_perfil.html", cliente=current_user, valid_set_asides=sorted(VALID_SET_ASIDES))
 
 
 # ── Assinatura / Stripe ───────────────────────────────────────────────────────
@@ -551,7 +559,7 @@ def editar_palavras():
 @login_required
 def assinar(plano):
     if current_user.plano_pago:
-        flash("Você já possui uma assinatura ativa. Para trocar de plano, cancele o atual primeiro.", "info")
+        flash("You already have an active subscription. To change plans, cancel the current one first.", "info")
         return redirect(url_for("dashboard"))
 
     periodo = request.args.get("periodo", "mensal")
@@ -566,7 +574,7 @@ def assinar(plano):
     price_id = precos.get(f"{plano}_anual" if periodo == "anual" else plano)
 
     if not price_id:
-        flash("Plano inválido.", "erro")
+        flash("Invalid plan.", "erro")
         return redirect(url_for("index"))
 
     conn = conectar()
@@ -602,7 +610,7 @@ def gerenciar_assinatura():
     conn.close()
 
     if not row or not row[0]:
-        flash("Nenhuma assinatura encontrada.", "info")
+        flash("No subscription found.", "info")
         return redirect(url_for("dashboard"))
 
     try:
@@ -621,7 +629,7 @@ def gerenciar_assinatura():
         conn.commit()
         cur.close()
         conn.close()
-        flash("Assinatura não encontrada. Seu plano foi resetado — assine novamente.", "info")
+        flash("Subscription not found. Your plan was reset — please subscribe again.", "info")
         return redirect(url_for("index"))
 
 
@@ -760,9 +768,9 @@ def newsletter_cadastro():
     cur.close()
     conn.close()
 
-    enviar_email(email, "Você está no Radar Semanal do LicitaBot!", f"""
+    enviar_email(email, "Você está no Radar Semanal do TenderSentinel!", f"""
     <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-        <h1 style="color:#0f2444">Licita<span style="color:#c9a84c">Bot</span></h1>
+        <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
         <p>Olá, <strong>{html_lib.escape(nome)}</strong>!</p>
         <p>Você está no <strong>Radar Semanal</strong>. Toda segunda às 9h você recebe as melhores oportunidades da semana.</p>
         <p style="color:#64748b;font-size:0.85rem;margin-top:1.5rem">

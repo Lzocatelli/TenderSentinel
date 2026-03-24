@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TenderSentinel | US Procurement Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&amp;family=Work+Sans:wght@300;400;500;600&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-highest": "#d3e4fe",
+                        "surface-dim": "#cbdbf5",
+                        "on-secondary-fixed": "#341100",
+                        "on-background": "#0b1c30",
+                        "on-surface": "#0b1c30",
+                        "tertiary-container": "#001e2f",
+                        "error": "#ba1a1a",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-secondary": "#ffffff",
+                        "secondary": "#9f4200",
+                        "surface-tint": "#565e74",
+                        "secondary-container": "#fc7218",
+                        "primary-fixed-dim": "#bec6e0",
+                        "inverse-primary": "#bec6e0",
+                        "on-primary-fixed": "#131b2e",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-high": "#dce9ff",
+                        "outline-variant": "#c6c6cd",
+                        "surface": "#f8f9ff",
+                        "on-tertiary-fixed": "#001e2f",
+                        "surface-container-low": "#eff4ff",
+                        "on-tertiary-fixed-variant": "#004c6e",
+                        "surface-bright": "#f8f9ff",
+                        "primary-container": "#131b2e",
+                        "on-primary-container": "#7c839b",
+                        "background": "#f8f9ff",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "tertiary-fixed": "#c9e6ff",
+                        "secondary-fixed": "#ffdbcb",
+                        "inverse-surface": "#213145",
+                        "primary-fixed": "#dae2fd",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#ffb692",
+                        "surface-variant": "#d3e4fe",
+                        "tertiary": "#000000",
+                        "primary": "#000000",
+                        "on-surface-variant": "#45464d",
+                        "on-tertiary-container": "#008cc7",
+                        "on-secondary-fixed-variant": "#793100",
+                        "surface-container": "#e5eeff",
+                        "tertiary-fixed-dim": "#89ceff",
+                        "error-container": "#ffdad6",
+                        "on-primary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "outline": "#76777d",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#592200"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Work Sans"],
+                        "label": ["Space Grotesk"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .tonal-layering { transition: background-color 0.3s ease; }
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #9f4200;
+            border-radius: 50%;
+            display: inline-block;
+            position: relative;
+        }
+        .pulse-dot::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            background-color: #9f4200;
+            border-radius: 50%;
+            z-index: -1;
+            opacity: 0.7;
+            animation: ripple 2s infinite ease-out;
+        }
+        @keyframes ripple {
+            0% { transform: scale(1); opacity: 0.7; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-secondary-container selection:text-on-secondary-container">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm">
+<div class="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
+<div class="text-xl font-black tracking-tighter text-slate-950 font-headline">TenderSentinel</div>
+<div class="hidden md:flex items-center space-x-8">
+<a class="font-headline font-bold tracking-tight text-sm uppercase text-orange-700 border-b-2 border-orange-700 pb-1" href="#">Market Intelligence</a>
+<a class="font-headline font-bold tracking-tight text-sm uppercase text-slate-600 hover:text-slate-900 transition-colors" href="#">How it Works</a>
+<a class="font-headline font-bold tracking-tight text-sm uppercase text-slate-600 hover:text-slate-900 transition-colors" href="#">Pricing</a>
+<a class="font-headline font-bold tracking-tight text-sm uppercase text-slate-600 hover:text-slate-900 transition-colors" href="#">Case Studies</a>
+</div>
+<div class="flex items-center space-x-4">
+<button class="px-4 py-2 text-sm font-bold font-headline text-slate-950 hover:bg-slate-100 rounded-md transition-all">Login</button>
+<button class="px-5 py-2 text-sm font-bold font-headline bg-primary text-white rounded-md active:scale-95 duration-150 ease-in-out">Get Started</button>
+</div>
+</div>
+</nav>
+<!-- Hero Section -->
+<section class="relative pt-32 pb-24 overflow-hidden bg-gradient-to-b from-primary-container to-surface">
+<div class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+<div class="lg:col-span-7 z-10">
+<div class="inline-flex items-center space-x-2 bg-surface-container-highest/10 px-3 py-1 rounded-full mb-6">
+<span class="pulse-dot"></span>
+<span class="font-label text-xs uppercase tracking-widest text-on-primary-container">Live Intelligence Feed Active</span>
+</div>
+<h1 class="font-headline text-5xl md:text-7xl font-black tracking-tighter text-white mb-6 leading-[1.1]">
+                    Dominate the <span class="text-secondary-container">US Government</span> Contract Market.
+                </h1>
+<p class="font-body text-lg md:text-xl text-on-primary-container mb-10 max-w-2xl leading-relaxed">
+                    TenderSentinel leverages proprietary AI to monitor 40,000+ federal, state, and local procurement portals in real-time. Never miss a high-value opportunity again.
+                </p>
+<div class="flex flex-col sm:flex-row gap-4">
+<button class="px-8 py-4 bg-secondary text-white font-headline font-bold rounded-lg text-lg flex items-center justify-center gap-2 group shadow-xl shadow-secondary/20">
+                        Get Started <span class="material-symbols-outlined text-xl">arrow_forward</span>
+</button>
+<button class="px-8 py-4 bg-white/10 backdrop-blur-md text-white border border-white/20 font-headline font-bold rounded-lg text-lg hover:bg-white/20 transition-all">
+                        View Live Tenders
+                    </button>
+</div>
+</div>
+<div class="lg:col-span-5 relative">
+<div class="aspect-square bg-surface-container-highest rounded-xl overflow-hidden shadow-2xl rotate-3 relative z-10">
+<img class="w-full h-full object-cover" data-alt="high-tech interface showing data visualizations and financial charts on a dark glass screen with blue highlights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuChr2fZeqjtN0XYqOZnzOIIOeuID9bA5OEUGRo8Fz7AjkdRafnDHWPme-ZciP4MjixeBsDqIhuzdBjUBE52uUg0KYIZmWUbWX29CjRf__-WI7ah2QPMqXFMCXvzWPgs7uiXOGj8eFfC7R7xNipBieR_1BPdAtsfNnLRZSb8_b3Rc-ikaCXNUR0LD15QidNRlENcVZnbsktPTl9mc2klV6qSiEwWBZ0-tDwOUwI5Q7cNRKN2abhv4LKzwpvAe4P-7_owlO5NVIk4_Ss"/>
+<div class="absolute inset-0 bg-gradient-to-t from-primary-container/80 to-transparent"></div>
+<div class="absolute bottom-6 left-6 right-6 p-4 bg-white/10 backdrop-blur-xl rounded-lg border border-white/20">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label text-[10px] text-white/60 uppercase">Recent Match</span>
+<span class="text-secondary-container font-label text-[10px] font-bold">98% Fit</span>
+</div>
+<div class="text-white font-headline font-bold text-sm">DoD Infrastructure Modernization - Phase IV</div>
+</div>
+</div>
+<div class="absolute -top-12 -right-12 w-64 h-64 bg-secondary/10 rounded-full blur-3xl"></div>
+<div class="absolute -bottom-12 -left-12 w-48 h-48 bg-on-tertiary-container/20 rounded-full blur-3xl"></div>
+</div>
+</div>
+</section>
+<!-- Trust Bar -->
+<section class="py-12 bg-surface-container-low border-y border-outline-variant/10">
+<div class="max-w-7xl mx-auto px-6">
+<p class="text-center font-label text-xs uppercase tracking-[0.2em] text-on-surface-variant mb-8">Trusted by Contractors Securing Billion-Dollar Budgets</p>
+<div class="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-40 grayscale contrast-125">
+<div class="font-headline font-black text-2xl tracking-tighter">DEPT OF DEFENSE</div>
+<div class="font-headline font-black text-2xl tracking-tighter">GSA</div>
+<div class="font-headline font-black text-2xl tracking-tighter">NASA</div>
+<div class="font-headline font-black text-2xl tracking-tighter">HOMELAND SECURITY</div>
+<div class="font-headline font-black text-2xl tracking-tighter">EPA</div>
+</div>
+</div>
+</section>
+<!-- How it Works -->
+<section class="py-24 bg-surface">
+<div class="max-w-7xl mx-auto px-6">
+<div class="max-w-3xl mb-16">
+<h2 class="font-headline text-4xl font-extrabold tracking-tight mb-4">Precision Procurement.</h2>
+<p class="text-on-surface-variant text-lg">Our systematic approach eliminates the noise of the public sector, delivering only the contracts that align with your capabilities.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+<!-- Step 1 -->
+<div class="group">
+<div class="w-16 h-16 bg-surface-container-high rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined text-3xl">radar</span>
+</div>
+<div class="font-label text-secondary font-bold text-sm mb-2">01. MONITOR</div>
+<h3 class="font-headline text-2xl font-bold mb-3">Omnichannel Scanning</h3>
+<p class="text-on-surface-variant">Continuous aggregation from SAM.gov, state portals, and local municipal sites. We see the RFPs the moment they drop.</p>
+</div>
+<!-- Step 2 -->
+<div class="group">
+<div class="w-16 h-16 bg-surface-container-high rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined text-3xl" data-weight="fill">analytics</span>
+</div>
+<div class="font-label text-secondary font-bold text-sm mb-2">02. ANALYZE</div>
+<h3 class="font-headline text-2xl font-bold mb-3">AI Scorecarding</h3>
+<p class="text-on-surface-variant">Our engine parses technical requirements against your past performance and NAICS codes to predict win probability.</p>
+</div>
+<!-- Step 3 -->
+<div class="group">
+<div class="w-16 h-16 bg-surface-container-high rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary group-hover:text-white transition-all">
+<span class="material-symbols-outlined text-3xl">trophy</span>
+</div>
+<div class="font-label text-secondary font-bold text-sm mb-2">03. WIN</div>
+<h3 class="font-headline text-2xl font-bold mb-3">Strategic Capture</h3>
+<p class="text-on-surface-variant">Receive ready-to-use insights and bid templates tailored for specific procurement officers to maximize competitive edge.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Core Features (Bento Grid) -->
+<section class="py-24 bg-surface-container-low">
+<div class="max-w-7xl mx-auto px-6">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Large Feature Card -->
+<div class="lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 flex flex-col justify-between overflow-hidden relative border border-outline-variant/10 group">
+<div class="relative z-10 max-w-md">
+<div class="inline-block px-3 py-1 bg-on-tertiary-container/10 rounded-full mb-4">
+<span class="font-label text-[10px] text-on-tertiary-container font-bold uppercase tracking-wider">Predictive Modeling</span>
+</div>
+<h3 class="font-headline text-3xl font-bold mb-4">AI Opportunity Analysis</h3>
+<p class="text-on-surface-variant mb-6">Our algorithms don't just find tenders; they deconstruct them. Understand contract nuances, recurring budget cycles, and anticipated award timelines before the competition even knows they exist.</p>
+</div>
+<div class="lg:absolute lg:bottom-0 lg:right-0 w-full lg:w-1/2 p-4 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+<div class="bg-surface p-4 rounded-t-xl shadow-lg border-x border-t border-outline-variant/10">
+<div class="flex items-center justify-between mb-4">
+<span class="font-label text-[10px] text-on-surface-variant">Win Probability Index</span>
+<span class="text-secondary font-bold font-label">84.2%</span>
+</div>
+<div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[84%]"></div>
+</div>
+<div class="mt-4 grid grid-cols-3 gap-2">
+<div class="h-12 bg-surface-container-high rounded"></div>
+<div class="h-12 bg-surface-container-high rounded"></div>
+<div class="h-12 bg-secondary/20 rounded"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Small Feature Card 1 -->
+<div class="lg:col-span-4 bg-primary text-white rounded-xl p-8 flex flex-col justify-between border border-primary-container">
+<div>
+<span class="material-symbols-outlined text-4xl mb-6 text-secondary-container">notifications_active</span>
+<h3 class="font-headline text-2xl font-bold mb-4">Real-time Alerts</h3>
+<p class="text-on-primary-container text-sm">Custom trigger alerts via SMS, Slack, or Email the second a matching RFP hits the public record.</p>
+</div>
+<div class="mt-8 pt-6 border-t border-white/10 flex items-center justify-between">
+<span class="font-label text-xs uppercase text-white/40">Latency</span>
+<span class="font-label text-xs text-secondary-container">&lt; 150ms</span>
+</div>
+</div>
+<!-- Small Feature Card 2 -->
+<div class="lg:col-span-4 bg-surface-container-high rounded-xl p-8 flex flex-col justify-between group">
+<div>
+<span class="material-symbols-outlined text-4xl mb-6 text-primary">groups</span>
+<h3 class="font-headline text-2xl font-bold mb-4">Competitor Insights</h3>
+<p class="text-on-surface-variant text-sm">Analyze incumbent performance and previous award amounts to price your bid perfectly.</p>
+</div>
+<div class="mt-8 space-y-2">
+<div class="h-1 bg-primary/10 w-full rounded-full overflow-hidden">
+<div class="h-full bg-primary/40 w-[60%]"></div>
+</div>
+<div class="h-1 bg-primary/10 w-full rounded-full overflow-hidden">
+<div class="h-full bg-primary/40 w-[45%]"></div>
+</div>
+</div>
+</div>
+<!-- Large Feature Card 2 -->
+<div class="lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 flex flex-col lg:flex-row gap-8 border border-outline-variant/10">
+<div class="flex-1">
+<span class="material-symbols-outlined text-4xl mb-6 text-secondary">gavel</span>
+<h3 class="font-headline text-3xl font-bold mb-4">Compliance Tracking</h3>
+<p class="text-on-surface-variant">Automated checklists for FAR/DFARS requirements. Ensure your proposal meets 100% of the mandatory criteria before submission.</p>
+<button class="mt-6 text-primary font-label text-sm font-bold flex items-center gap-1 group">
+                            LEARN ABOUT COMPLIANCE <span class="material-symbols-outlined text-base group-hover:translate-x-1 transition-transform">arrow_right_alt</span>
+</button>
+</div>
+<div class="flex-1 bg-surface rounded-lg p-6 flex flex-col justify-center">
+<div class="space-y-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-xl">check_circle</span>
+<span class="text-sm font-medium">Cage Code Validated</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-xl">check_circle</span>
+<span class="text-sm font-medium">NAICS 541511 Match</span>
+</div>
+<div class="flex items-center gap-3 opacity-30">
+<span class="material-symbols-outlined text-xl">circle</span>
+<span class="text-sm font-medium">Past Performance Upload</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Pricing Section -->
+<section class="py-24 bg-surface">
+<div class="max-w-7xl mx-auto px-6">
+<div class="text-center mb-16">
+<h2 class="font-headline text-4xl font-extrabold tracking-tight mb-4">Flexible Intelligence Packages.</h2>
+<p class="text-on-surface-variant max-w-2xl mx-auto">From boutique consultancies to prime defense contractors, we have a tier built for your growth strategy.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<!-- Starter -->
+<div class="bg-surface-container-low rounded-xl p-8 border border-transparent hover:border-outline-variant/30 transition-all">
+<div class="font-label text-xs uppercase font-bold text-on-surface-variant mb-2">Starter</div>
+<div class="mb-6">
+<span class="font-headline text-4xl font-black">$499</span>
+<span class="text-on-surface-variant font-label text-sm">/mo</span>
+</div>
+<p class="text-sm text-on-surface-variant mb-8">Ideal for small businesses targeting regional contracts.</p>
+<ul class="space-y-4 mb-8">
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-primary text-lg">check</span>
+                            Single State Monitoring
+                        </li>
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-primary text-lg">check</span>
+                            Standard Email Alerts
+                        </li>
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-primary text-lg">check</span>
+                            5 Saved Searches
+                        </li>
+</ul>
+<button class="w-full py-3 bg-white border border-outline-variant text-primary font-headline font-bold rounded hover:bg-surface-container-high transition-colors">Choose Starter</button>
+</div>
+<!-- Growth -->
+<div class="bg-primary text-white rounded-xl p-8 shadow-2xl relative overflow-hidden transform scale-105 z-10">
+<div class="absolute top-0 right-0 bg-secondary text-white font-label text-[10px] font-bold py-1 px-4 rounded-bl-lg">MOST POPULAR</div>
+<div class="font-label text-xs uppercase font-bold text-on-primary-container mb-2">Growth</div>
+<div class="mb-6">
+<span class="font-headline text-4xl font-black">$1,250</span>
+<span class="text-on-primary-container font-label text-sm">/mo</span>
+</div>
+<p class="text-sm text-on-primary-container mb-8">National scale monitoring for growing prime contractors.</p>
+<ul class="space-y-4 mb-8">
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-secondary-container text-lg">check</span>
+                            Full US Federal &amp; State Access
+                        </li>
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-secondary-container text-lg">check</span>
+                            AI Win-Probability Scoring
+                        </li>
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-secondary-container text-lg">check</span>
+                            Competitor Award Analysis
+                        </li>
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-secondary-container text-lg">check</span>
+                            Slack/API Integration
+                        </li>
+</ul>
+<button class="w-full py-3 bg-secondary text-white font-headline font-bold rounded shadow-lg shadow-black/20 hover:bg-secondary-container transition-colors">Choose Growth</button>
+</div>
+<!-- Enterprise -->
+<div class="bg-surface-container-low rounded-xl p-8 border border-transparent hover:border-outline-variant/30 transition-all">
+<div class="font-label text-xs uppercase font-bold text-on-surface-variant mb-2">Enterprise</div>
+<div class="mb-6">
+<span class="font-headline text-4xl font-black">Custom</span>
+</div>
+<p class="text-sm text-on-surface-variant mb-8">Full-suite intelligence for global defense and infrastructure firms.</p>
+<ul class="space-y-4 mb-8">
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-primary text-lg">check</span>
+                            Global Procurement Channels
+                        </li>
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-primary text-lg">check</span>
+                            Dedicated Capture Consultant
+                        </li>
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-primary text-lg">check</span>
+                            Custom AI Model Training
+                        </li>
+<li class="flex items-start gap-3 text-sm">
+<span class="material-symbols-outlined text-primary text-lg">check</span>
+                            White-Glove Onboarding
+                        </li>
+</ul>
+<button class="w-full py-3 bg-white border border-outline-variant text-primary font-headline font-bold rounded hover:bg-surface-container-high transition-colors">Contact Sales</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Testimonials -->
+<section class="py-24 bg-surface-container-low">
+<div class="max-w-7xl mx-auto px-6">
+<h2 class="font-headline text-center text-3xl font-black mb-16 tracking-tight">Contractor Feedback.</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+<div class="bg-white p-10 rounded-xl relative shadow-sm border border-outline-variant/5">
+<div class="absolute -top-4 -left-4 text-6xl text-secondary-container opacity-20 font-headline">“</div>
+<p class="font-body text-xl italic text-on-surface mb-8">"TenderSentinel shortened our capture cycle by 40%. The AI analysis caught a subcontracting requirement in a $20M Navy contract we would have otherwise scrolled past."</p>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="portrait of a professional man in a tailored grey suit with a serious but confident expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCgK3SeXfmWuGDpvssgQEHU_GwVpylJV1ZJlsRstd3kz8xTWP3W0RHHV8P3sgwjjkTzlNXdeSCBI-5Ek3rI8KA0TxPGPnTYaXS6s46XH3Tcq_AWZSaeJMd7Qy6nBesjHStF2TK9cE0xumKhzF9Pl5celTgI5fRiD9gB84Eu5Si8Cyr2On7gulEsntSrtAJLwf2oOL-EGS2pseIpF9evX2atD88BwZY2BD4R_1bhY24lTPOuI6t7Wc2mJ2kk_gVRG-16i7A5HnUWIU"/>
+</div>
+<div>
+<div class="font-headline font-bold text-sm">Marcus Chen</div>
+<div class="font-label text-xs text-on-surface-variant">Director of Business Dev, AeroSystems</div>
+</div>
+</div>
+</div>
+<div class="bg-white p-10 rounded-xl relative shadow-sm border border-outline-variant/5">
+<div class="absolute -top-4 -left-4 text-6xl text-secondary-container opacity-20 font-headline">“</div>
+<p class="font-body text-xl italic text-on-surface mb-8">"Finally, a procurement tool that doesn't feel like it was built in 1995. The real-time alerts are the best in the industry—period. It's our unfair advantage."</p>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="professional woman in corporate attire smiling confidently in a modern office hallway" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNo_iQ4hjxrif_ReVc9uTtj7qB8ErMRD_iSeaSM9rCmdyxQz4r_YyNhSxuUy_PviKS07PkQMGII7IR6PCP8WaGY6-5gUZNsMdf9OvZzpWVJDlVOavMJmlT6EFjkK8Jfu1FNNWxGxjsEJ7uHqtYwVKBv7U3t3xbdk4JylOICnA96m90_cBiIbvuwusr3lzCBaKTk_wYi56bwTCKEldO9cVQ4TNu0RzoPclAbEk-ehGvQlEVK1FKZTZ9krq0VyOYWIPn9a7vD3oYXJQ"/>
+</div>
+<div>
+<div class="font-headline font-bold text-sm">Sarah Jenkins</div>
+<div class="font-label text-xs text-on-surface-variant">CEO, GovSecure Solutions</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Final Section -->
+<section class="py-24 bg-primary text-white">
+<div class="max-w-4xl mx-auto px-6 text-center">
+<h2 class="font-headline text-4xl md:text-5xl font-black mb-6 tracking-tighter">Ready to out-bid the competition?</h2>
+<p class="text-on-primary-container text-lg mb-10">Join 500+ top-tier contractors using TenderSentinel to navigate US public procurement with total clarity.</p>
+<div class="flex flex-col sm:flex-row gap-4 justify-center">
+<button class="px-8 py-4 bg-secondary text-white font-headline font-bold rounded-lg text-lg hover:bg-secondary-container transition-all">Start Free Trial</button>
+<button class="px-8 py-4 bg-white/10 text-white border border-white/20 font-headline font-bold rounded-lg text-lg hover:bg-white/20 transition-all">Schedule Demo</button>
+</div>
+</div>
+</section>
+<!-- Footer -->
+<footer class="bg-slate-950 text-white w-full py-12 px-6 border-t border-slate-800">
+<div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
+<div class="md:col-span-1">
+<div class="text-lg font-bold text-orange-500 mb-4">TenderSentinel</div>
+<p class="font-['Work_Sans'] text-sm font-light text-slate-400 leading-relaxed">
+                    Advanced market intelligence for US public procurement. Empowering businesses to navigate complex government contracts with AI-driven precision.
+                </p>
+</div>
+<div>
+<h4 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-white/40">Product</h4>
+<ul class="space-y-4 font-['Work_Sans'] text-sm font-light">
+<li><a class="text-slate-400 hover:text-white transition-colors hover:translate-x-1 inline-block" href="#">Market Intelligence</a></li>
+<li><a class="text-slate-400 hover:text-white transition-colors hover:translate-x-1 inline-block" href="#">Pricing</a></li>
+<li><a class="text-slate-400 hover:text-white transition-colors hover:translate-x-1 inline-block" href="#">API Documentation</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-white/40">Legal</h4>
+<ul class="space-y-4 font-['Work_Sans'] text-sm font-light">
+<li><a class="text-slate-400 hover:text-white transition-colors hover:translate-x-1 inline-block" href="#">Privacy Policy</a></li>
+<li><a class="text-slate-400 hover:text-white transition-colors hover:translate-x-1 inline-block" href="#">Terms of Service</a></li>
+<li><a class="text-slate-400 hover:text-white transition-colors hover:translate-x-1 inline-block" href="#">Security</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-white/40">Contact</h4>
+<ul class="space-y-4 font-['Work_Sans'] text-sm font-light">
+<li><a class="text-slate-400 hover:text-white transition-colors hover:translate-x-1 inline-block" href="#">Contact Sales</a></li>
+<li><a class="text-slate-400 hover:text-white transition-colors hover:translate-x-1 inline-block" href="#">Support Center</a></li>
+</ul>
+</div>
+</div>
+<div class="max-w-7xl mx-auto mt-16 pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="font-['Work_Sans'] text-sm font-light text-slate-500">© 2024 TenderSentinel. US Procurement Intelligence. All rights reserved.</p>
+<div class="flex gap-6">
+<span class="material-symbols-outlined text-slate-500 hover:text-white cursor-pointer">share</span>
+<span class="material-symbols-outlined text-slate-500 hover:text-white cursor-pointer">public</span>
+<span class="material-symbols-outlined text-slate-500 hover:text-white cursor-pointer">mail</span>
+</div>
+</div>
+</footer>
+</body></html>

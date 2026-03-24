@@ -1,24 +1,24 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Entrar — LicitaBot</title>
+    <title>Sign In — TenderSentinel</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
 <nav>
-    <a href="/" class="nav-logo">Licita<span>Bot</span></a>
+    <a href="/" class="nav-logo">TenderSentinel</a>
     <div class="nav-links">
-        <a href="/cadastro">Criar conta</a>
+        <a href="/cadastro">Create account</a>
     </div>
 </nav>
 
 <div class="form-container">
     <div class="form-card">
-        <h1 class="form-title">Entrar</h1>
-        <p class="form-subtitle">Acesse seu painel de licitações.</p>
+        <h1 class="form-title">Sign In</h1>
+        <p class="form-subtitle">Access your contract monitoring dashboard.</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
@@ -29,24 +29,24 @@
         <form method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
-                <label>E-mail</label>
-                <input type="email" name="email" placeholder="seu@email.com" required>
+                <label>Email</label>
+                <input type="email" name="email" placeholder="you@company.com" required>
             </div>
             <div class="form-group">
-                <label>Senha</label>
-                <input type="password" name="senha" placeholder="Sua senha" required>
+                <label>Password</label>
+                <input type="password" name="senha" placeholder="Your password" required>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+            <button type="submit" class="btn btn-primary btn-block">Sign In</button>
         </form>
 
         <div class="form-footer">
-            Não tem conta? <a href="/cadastro">Criar conta grátis</a>
+            Don't have an account? <a href="/cadastro">Create one free</a>
         </div>
     </div>
 </div>
 
 <footer>
-    <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
+    <p>© 2026 TenderSentinel — Smart Federal Contract Monitor</p>
 </footer>
 
 </body>

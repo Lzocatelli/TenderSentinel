@@ -2,57 +2,58 @@ import requests
 import os
 import time
 from datetime import date, timedelta
+from dotenv import load_dotenv
 from app.database import conectar
 
-MODALIDADES = [4, 5, 6, 7]  # Concorrência, Pregão, Dispensa, Inexigibilidade
+load_dotenv()
 
-def buscar_licitacoes(data_inicio=None, data_fim=None, pagina=1):
+SAM_API_URL = "https://api.sam.gov/opportunities/v2/search"
+
+
+def buscar_licitacoes(data_inicio=None, data_fim=None):
     if not data_inicio:
-        data_inicio = (date.today() - timedelta(days=1)).strftime("%Y%m%d")
+        data_inicio = (date.today() - timedelta(days=1)).strftime("%m/%d/%Y")
     if not data_fim:
-        data_fim = date.today().strftime("%Y%m%d")
+        data_fim = date.today().strftime("%m/%d/%Y")
 
-    url = "https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao"
+    api_key = os.getenv("SAM_API_KEY")
     todas = []
+    offset = 0
+    limit = 1000
 
-    for modalidade in MODALIDADES:
-        params = {
-            "dataInicial": data_inicio,
-            "dataFinal": data_fim,
-            "pagina": pagina,
-            "tamanhoPagina": 50,
-            "codigoModalidadeContratacao": modalidade
-        }
+    params = {
+        "api_key": api_key,
+        "postedFrom": data_inicio,
+        "postedTo": data_fim,
+        "limit": limit,
+        "offset": offset,
+    }
 
-        # --- SISTEMA DE RESILIÊNCIA (TENTATIVAS) ---
-        tentativas = 3
-        for tentativa in range(tentativas):
-            try:
-                response = requests.get(url, params=params, timeout=8)
-                
-                if response.status_code == 200:
-                    dados = response.json()
-                    todas.extend(dados.get("data", []))
-                    break  # Sucesso! Sai do loop de tentativas e vai pra próxima modalidade
-                else:
-                    print(f"Erro modalidade {modalidade}: Status {response.status_code}")
-                    break  # Erro do servidor que não seja timeout, sai do loop
-                    
-            except requests.exceptions.Timeout:
-                print(f"Demora na resposta do PNCP (Tentativa {tentativa + 1}/{tentativas})...")
-                if tentativa < tentativas - 1:
-                    time.sleep(3)  # Espera 3 segundos antes de bater no servidor de novo
-                else:
-                    print(f"O PNCP não respondeu para a modalidade {modalidade} após {tentativas} tentativas.")
-            except Exception as e:
-                print(f"Erro na requisição: {e}")
-                break
+    for tentativa in range(3):
+        try:
+            response = requests.get(SAM_API_URL, params=params, timeout=30)
+
+            if response.status_code == 200:
+                data = response.json()
+                todas = data.get("opportunitiesData", [])
+                return todas
+            else:
+                print(f"SAM.gov error: {response.status_code}")
+                return todas
+
+        except requests.exceptions.Timeout:
+            print(f"SAM.gov timeout (attempt {tentativa + 1}/3)...")
+            if tentativa < 2:
+                time.sleep(3)
+            else:
+                print("SAM.gov did not respond after 3 attempts.")
 
     return todas
 
+
 def salvar_licitacoes(licitacoes):
     if not licitacoes:
-        print("Nenhuma licitação encontrada.")
+        print("No opportunities found.")
         return 0
 
     conn = conectar()
@@ -61,29 +62,46 @@ def salvar_licitacoes(licitacoes):
 
     for item in licitacoes:
         try:
+            # Parse state from place of performance
+            pop = item.get("placeOfPerformance") or {}
+            state = (pop.get("state") or {}).get("code")
+
+            # Parse deadline date
+            deadline_raw = item.get("responseDeadLine")
+            deadline = deadline_raw[:10] if deadline_raw else None
+
+            # Parse posted date
+            posted_raw = item.get("postedDate")
+            posted = posted_raw[:10] if posted_raw else None
+
             cur.execute("""
-                INSERT INTO licitacoes (pncp_id, orgao, objeto, valor, data_publicacao, link, uf)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (pncp_id) DO NOTHING
+                INSERT INTO licitacoes
+                    (sam_id, orgao, objeto, data_publicacao, link, uf, naics_code, set_aside, deadline)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (sam_id) DO NOTHING
             """, (
-                item.get("numeroControlePNCP"),
-                item.get("orgaoEntidade", {}).get("razaoSocial"),
-                item.get("objetoCompra"),
-                item.get("valorTotalEstimado"),
-                item.get("dataPublicacaoPncp", "")[:10] if item.get("dataPublicacaoPncp") else None,
-                item.get("linkSistemaOrigem"),
-                item.get("unidadeOrgao", {}).get("ufSigla"),
+                item.get("noticeId"),
+                item.get("fullParentPathName"),
+                item.get("title"),
+                posted,
+                item.get("uiLink"),
+                state,
+                item.get("naicsCode"),
+                item.get("typeOfSetAside") or None,
+                deadline,
             ))
             if cur.rowcount > 0:
                 salvas += 1
         except Exception as e:
-            print(f"Erro ao salvar: {e}")
+            print(f"Error saving opportunity: {e}")
+            conn.rollback()
             continue
 
     conn.commit()
     cur.close()
     conn.close()
     return salvas
+
 
 def filtrar_por_palavra_chave(palavras_chave):
     conn = conectar()
@@ -92,7 +110,7 @@ def filtrar_por_palavra_chave(palavras_chave):
 
     for palavra in palavras_chave:
         cur.execute("""
-            SELECT pncp_id, orgao, objeto, valor, data_publicacao, link
+            SELECT sam_id, orgao, objeto, deadline, data_publicacao, link, naics_code, set_aside
             FROM licitacoes
             WHERE LOWER(objeto) LIKE %s
         """, (f"%{palavra.lower()}%",))

@@ -47,13 +47,16 @@ def criar_tabelas():
     cur.execute("""
         CREATE TABLE IF NOT EXISTS licitacoes (
             id SERIAL PRIMARY KEY,
-            pncp_id TEXT UNIQUE,
+            sam_id TEXT UNIQUE,
             orgao TEXT,
             objeto TEXT,
             valor NUMERIC,
             data_publicacao DATE,
+            deadline DATE,
             link TEXT,
             uf TEXT,
+            naics_code TEXT,
+            set_aside TEXT,
             criado_em TIMESTAMP DEFAULT NOW()
         );
     """)
@@ -77,10 +80,16 @@ def criar_tabelas():
     # Migrations incrementais: colunas adicionadas em versões posteriores
     migrations = [
         ("licitacoes", "uf", "TEXT"),
+        ("licitacoes", "sam_id", "TEXT"),
+        ("licitacoes", "deadline", "DATE"),
+        ("licitacoes", "naics_code", "TEXT"),
+        ("licitacoes", "set_aside", "TEXT"),
         ("clientes", "plano", "TEXT"),
         ("clientes", "stripe_customer_id", "TEXT"),
         ("clientes", "stripe_subscription_id", "TEXT"),
         ("clientes", "stripe_last_session_id", "TEXT"),
+        ("clientes", "naics_codes", "TEXT[]"),
+        ("clientes", "set_asides", "TEXT[]"),
     ]
     for tabela, col, tipo in migrations:
         try:

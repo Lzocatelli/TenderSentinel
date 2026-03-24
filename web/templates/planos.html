@@ -1,102 +1,87 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planos — LicitaBot</title>
+    <title>Plans — TenderSentinel</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
 <nav>
-    <a href="/" class="nav-logo">Licita<span>Bot</span></a>
+    <a href="/" class="nav-logo">TenderSentinel</a>
     <div class="nav-links">
         <a href="/dashboard">Dashboard</a>
         <span style="color:rgba(255,255,255,0.6);font-size:0.9rem">{{ cliente.nome }}</span>
-        <a href="/logout">Sair</a>
+        <a href="/logout">Sign out</a>
     </div>
 </nav>
 
 <div class="section" style="padding:4rem 2rem">
-    <h1 class="section-title">Escolha seu plano</h1>
-    <p class="section-subtitle">Assinatura mensal. Cancele quando quiser pelo painel do Stripe.</p>
+    <h1 class="section-title">Choose your plan</h1>
+    <p class="section-subtitle">Monthly subscription. Cancel anytime from the Stripe portal.</p>
 
     {% if cliente.plano %}
     <p style="text-align:center;margin-bottom:2rem;color:var(--gray-500)">
-        Seu plano atual: <strong style="color:var(--navy);text-transform:capitalize">{{ cliente.plano }}</strong>
+        Current plan: <strong style="color:var(--navy);text-transform:capitalize">{{ cliente.plano }}</strong>
     </p>
     {% endif %}
 
     <div class="plans-grid">
         <div class="plan-card {% if cliente.plano == 'basico' %}featured{% endif %}">
-            {% if cliente.plano == 'basico' %}<div class="plan-badge">Seu plano</div>{% endif %}
-            <p class="plan-name">Básico</p>
-            <p class="plan-price">R$ 99<span>/mês</span></p>
+            {% if cliente.plano == 'basico' %}<div class="plan-badge">Your plan</div>{% endif %}
+            <p class="plan-name">Basic</p>
+            <p class="plan-price">$49<span>/mo</span></p>
             <ul class="plan-features">
-                <li>5 palavras-chave monitoradas</li>
-                <li>Alertas diários por e-mail</li>
-                <li>Acesso ao dashboard</li>
+                <li>5 keywords monitored</li>
+                <li>Daily email alerts</li>
+                <li>Dashboard access</li>
             </ul>
-            {% if pagarme_habilitado %}
-            <form action="{{ url_for('criar_sessao_checkout') }}" method="post" style="margin:0">
-                <input type="hidden" name="plano" value="basico">
-                <button type="submit" class="btn btn-primary btn-block">{% if cliente.plano == 'basico' %}Plano atual{% else %}Assinar{% endif %}</button>
-            </form>
-            {% else %}
-            <p class="plan-price" style="font-size:0.9rem;color:var(--gray-500)">Em breve</p>
-            {% endif %}
+            <a href="/assinar/basico" class="btn btn-primary btn-block">
+                {% if cliente.plano == 'basico' %}Current plan{% else %}Subscribe{% endif %}
+            </a>
         </div>
 
         <div class="plan-card featured">
-            <div class="plan-badge">Mais popular</div>
-            {% if cliente.plano == 'profissional' %}<div class="plan-badge" style="top:2.5rem">Seu plano</div>{% endif %}
-            <p class="plan-name">Profissional</p>
-            <p class="plan-price">R$ 249<span>/mês</span></p>
+            <div class="plan-badge">Most popular</div>
+            {% if cliente.plano == 'profissional' %}<div class="plan-badge" style="top:2.5rem">Your plan</div>{% endif %}
+            <p class="plan-name">Professional</p>
+            <p class="plan-price">$149<span>/mo</span></p>
             <ul class="plan-features">
-                <li>20 palavras-chave monitoradas</li>
-                <li>Alertas por e-mail e WhatsApp</li>
-                <li>Relatório semanal de oportunidades</li>
-                <li>Score de oportunidade</li>
-                <li>Acesso ao dashboard</li>
+                <li>20 keywords monitored</li>
+                <li>Daily email alerts</li>
+                <li>Weekly opportunity report</li>
+                <li>Opportunity score (0–10)</li>
+                <li>Dashboard access</li>
             </ul>
-            {% if pagarme_habilitado %}
-            <form action="{{ url_for('criar_sessao_checkout') }}" method="post" style="margin:0">
-                <input type="hidden" name="plano" value="profissional">
-                <button type="submit" class="btn btn-gold btn-block">{% if cliente.plano == 'profissional' %}Plano atual{% else %}Assinar{% endif %}</button>
-            </form>
-            {% else %}
-            <p class="plan-price" style="font-size:0.9rem;color:var(--gray-500)">Em breve</p>
-            {% endif %}
+            <a href="/assinar/profissional" class="btn btn-gold btn-block">
+                {% if cliente.plano == 'profissional' %}Current plan{% else %}Subscribe{% endif %}
+            </a>
         </div>
 
         <div class="plan-card {% if cliente.plano == 'agencia' %}featured{% endif %}">
-            {% if cliente.plano == 'agencia' %}<div class="plan-badge">Seu plano</div>{% endif %}
-            <p class="plan-name">Agência</p>
-            <p class="plan-price">R$ 499<span>/mês</span></p>
+            {% if cliente.plano == 'agencia' %}<div class="plan-badge">Your plan</div>{% endif %}
+            <p class="plan-name">Agency</p>
+            <p class="plan-price">$299<span>/mo</span></p>
             <ul class="plan-features">
-                <li>Palavras-chave ilimitadas</li>
-                <li>Tudo do plano Profissional</li>
-                <li>Gestão multi-cliente</li>
-                <li>Histórico completo</li>
+                <li>Unlimited keywords</li>
+                <li>Everything in Professional</li>
+                <li>Multi-client management</li>
+                <li>Full history</li>
             </ul>
-            {% if pagarme_habilitado %}
-            <form action="{{ url_for('criar_sessao_checkout') }}" method="post" style="margin:0">
-                <input type="hidden" name="plano" value="agencia">
-                <button type="submit" class="btn btn-primary btn-block">{% if cliente.plano == 'agencia' %}Plano atual{% else %}Assinar{% endif %}</button>
-            </form>
-            {% else %}
-            <p class="plan-price" style="font-size:0.9rem;color:var(--gray-500)">Em breve</p>
-            {% endif %}
+            <a href="/assinar/agencia" class="btn btn-primary btn-block">
+                {% if cliente.plano == 'agencia' %}Current plan{% else %}Subscribe{% endif %}
+            </a>
         </div>
     </div>
 
     <p style="text-align:center;margin-top:2rem;font-size:0.85rem;color:var(--gray-500)">
-        Pagamento seguro via Pagar.me (cartão, boleto ou PIX). Ao assinar, você será redirecionado ao checkout.
+        Secure payment via Stripe. You'll be redirected to checkout to complete your subscription.
     </p>
 </div>
 
 <footer>
-    <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
+    <p>© 2026 TenderSentinel — Smart Federal Contract Monitor</p>
 </footer>
 
 </body>

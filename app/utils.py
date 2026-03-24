@@ -1,24 +1,22 @@
-# Fonte única de verdade para limites de plano e helpers reutilizáveis
-
 PLANO_LIMITES = {
     "basico": 5,
     "profissional": 20,
-    "agencia": None,  # ilimitado
+    "agencia": None,  # unlimited
 }
 
 
 def limite_palavras(plano):
-    """Retorna o máximo de palavras-chave permitido. None = ilimitado."""
+    """Returns the max keywords allowed. None = unlimited."""
     if not plano:
         return 1
     return PLANO_LIMITES.get(plano, 1)
 
 
 def formatar_moeda(valor):
-    """Formata um valor numérico como moeda brasileira (R$ 1.234,56)."""
+    """Formats a numeric value as USD (e.g. $1,234.56)."""
     if valor is None:
-        return "Não informado"
+        return "N/A"
     try:
-        return f"R$ {float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"${float(valor):,.2f}"
     except Exception:
-        return "Não informado"
+        return "N/A"

@@ -1,74 +1,125 @@
 import re
 import math
-from typing import List
+from typing import List, Optional
 
 
-def _tokenize(texto: str) -> List[str]:
-    if not texto:
+def _tokenize(text: str) -> List[str]:
+    if not text:
         return []
-    texto = re.sub(r"[^0-9a-zA-ZÀ-ÿ]+", " ", texto.lower()).strip()
-    return [t for t in texto.split() if t]
+    text = re.sub(r"[^0-9a-zA-Z]+", " ", text.lower()).strip()
+    return [t for t in text.split() if t]
 
 
-def _heuristic_score(objeto: str, palavras_chave: List[str], valor: float = None) -> int:
+def _keyword_score(title: str, keywords: List[str]) -> float:
     """
-    Score baseado em correspondência de palavras-chave + bônus por valor.
-    Retorna inteiro de 0 a 10.
+    Keyword match score (0–6).
+    Phrase matches (multi-word) count double.
     """
-    if not objeto:
-        return 0
+    if not title or not keywords:
+        return 0.0
 
-    texto = objeto.lower()
-    palavras = [p.strip().lower() for p in (palavras_chave or []) if p.strip()]
-
-    if not palavras:
-        return 0
-
-    tokens = _tokenize(texto)
-    if not tokens:
-        return 0
-
+    text = title.lower()
+    tokens = _tokenize(text)
     token_set = set(tokens)
-    hits = 0
-    hits_frase = 0
+    keywords = [k.strip().lower() for k in keywords if k.strip()]
 
-    for p in palavras:
-        # Frases compostas: exige presença como substring
-        if " " in p:
-            if p in texto:
-                hits_frase += 1
-            continue
-        if p in token_set:
+    hits = 0
+    phrase_hits = 0
+
+    for kw in keywords:
+        if " " in kw:
+            if kw in text:
+                phrase_hits += 1
+        elif kw in token_set:
             hits += 1
 
-    # Densidade evita textos enormes com 1 hit parecerem tão bons
-    densidade = (hits + 2 * hits_frase) / max(12, len(tokens))
-    bruto = hits + 2 * hits_frase + (1 if densidade >= 0.06 else 0)
+    density = (hits + 2 * phrase_hits) / max(12, len(tokens))
+    raw = hits + 2 * phrase_hits + (1 if density >= 0.06 else 0)
 
-    if bruto <= 0:
-        return 0
+    if raw <= 0:
+        return 0.0
 
-    # Converte bruto para escala 0-10
-    # 1 hit = 4, 2 hits = 6, 3+ hits = 8, com bônus de valor chegando a 10
-    score_base = min(2 + bruto * 2, 8)
-
-    # Bônus por valor do contrato (escala logarítmica)
-    bonus_valor = 0
-    if valor and valor > 0:
-        try:
-            # R$10k = +0.5, R$100k = +1.0, R$1M = +1.5
-            bonus_valor = min(math.log10(valor / 10_000 + 1) * 0.75, 2.0)
-        except Exception:
-            pass
-
-    score_final = round(score_base + bonus_valor)
-    return max(0, min(10, score_final))
+    return min(2.0 + raw * 1.5, 6.0)
 
 
-def calcular_score(objeto: str, palavras_chave: List[str], valor: float = None) -> int:
+def _naics_score(opportunity_naics: Optional[str], user_naics: List[str]) -> float:
     """
-    Calcula score de oportunidade (0-10) para uma licitação.
-    Estratégia atual: heurística estatística.
-    Futuramente: Claude Haiku atrás de feature flag.
+    NAICS match score (0–3).
+    Exact 6-digit match = 3.0
+    4-digit industry group match = 1.5
+    2-digit sector match = 0.5
     """
-    return _heuristic_score(objeto, palavras_chave, valor)
+    if not opportunity_naics or not user_naics:
+        return 0.0
+
+    opp = str(opportunity_naics).strip()
+
+    for user_code in user_naics:
+        u = str(user_code).strip()
+
+        if opp == u:
+            return 3.0
+
+        # 4-digit industry group
+        if len(opp) >= 4 and len(u) >= 4 and opp[:4] == u[:4]:
+            return 1.5
+
+        # 2-digit sector
+        if len(opp) >= 2 and len(u) >= 2 and opp[:2] == u[:2]:
+            return 0.5
+
+    return 0.0
+
+
+def _set_aside_score(opportunity_set_aside: Optional[str], user_set_asides: List[str]) -> float:
+    """
+    +1.0 if the opportunity's set-aside matches one the user qualifies for.
+    Common codes: SBA, 8A, HZC (HUBZone), WOSB, EDWOSB, SDVOSB, VSB
+    """
+    if not opportunity_set_aside or not user_set_asides:
+        return 0.0
+
+    opp_sa = opportunity_set_aside.strip().upper()
+    user_sa = [s.strip().upper() for s in user_set_asides]
+
+    return 1.0 if opp_sa in user_sa else 0.0
+
+
+def _value_bonus(valor: Optional[float]) -> float:
+    """
+    Logarithmic value bonus (0–1).
+    $10k = +0.3, $100k = +0.6, $1M = +0.9, $10M+ = +1.0
+    """
+    if not valor or valor <= 0:
+        return 0.0
+    try:
+        return min(math.log10(valor / 10_000 + 1) * 0.5, 1.0)
+    except Exception:
+        return 0.0
+
+
+def calcular_score(
+    objeto: str,
+    palavras_chave: List[str],
+    valor: float = None,
+    naics_code: str = None,
+    user_naics: List[str] = None,
+    set_aside: str = None,
+    user_set_asides: List[str] = None,
+) -> int:
+    """
+    Relevance score (0–10) for a SAM.gov opportunity.
+
+    Breakdown:
+    - Keyword match:   0–6 pts
+    - NAICS match:     0–3 pts
+    - Set-aside match: 0–1 pt
+    - Value bonus:     0–1 pt (log scale, USD)
+    """
+    score = 0.0
+    score += _keyword_score(objeto, palavras_chave or [])
+    score += _naics_score(naics_code, user_naics or [])
+    score += _set_aside_score(set_aside, user_set_asides or [])
+    score += _value_bonus(valor)
+
+    return max(0, min(10, round(score)))

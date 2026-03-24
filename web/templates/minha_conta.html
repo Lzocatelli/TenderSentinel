@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minha Conta — LicitaBot</title>
+    <title>My Account — TenderSentinel</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
 <nav>
-    <a href="/" class="nav-logo">Licita<span>Bot</span></a>
+    <a href="/" class="nav-logo">TenderSentinel</a>
     <div class="nav-links">
         <span style="color:rgba(255,255,255,0.6);font-size:0.9rem">{{ current_user.nome }}</span>
         <a href="/dashboard">Dashboard</a>
-        <a href="/logout">Sair</a>
+        <a href="/logout">Sign out</a>
     </div>
 </nav>
 
 <div class="form-container">
     <div class="form-card" style="max-width:520px">
-        <h1 class="form-title">Minha Conta</h1>
+        <h1 class="form-title">My Account</h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
@@ -27,66 +27,64 @@
             {% endfor %}
         {% endwith %}
 
-        <!-- Informações da conta -->
         <div style="background:var(--gray-100);border-radius:10px;padding:1.25rem;margin-bottom:1.75rem">
             <div style="display:grid;gap:0.75rem">
                 <div>
-                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.5px">Nome</p>
+                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.5px">Name</p>
                     <p style="font-weight:600;color:var(--navy)">{{ current_user.nome }}</p>
                 </div>
                 <div>
-                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.5px">E-mail</p>
+                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.5px">Email</p>
                     <p style="font-weight:600;color:var(--navy)">{{ current_user.email }}</p>
                 </div>
                 <div>
-                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.5px">Plano</p>
-                    <p style="font-weight:600;color:var(--navy);text-transform:capitalize">{{ current_user.plano or 'Gratuito' }}</p>
+                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.5px">Plan</p>
+                    <p style="font-weight:600;color:var(--navy);text-transform:capitalize">{{ current_user.plano or 'Free' }}</p>
                 </div>
                 {% if renovacao %}
                 <div>
-                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.5px">Próxima renovação</p>
+                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.5px">Next renewal</p>
                     <p style="font-weight:600;color:var(--navy)">{{ renovacao }}</p>
                 </div>
                 {% endif %}
             </div>
             {% if current_user.plano_pago %}
             <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--gray-200)">
-                <a href="/gerenciar-assinatura" class="btn btn-secondary" style="font-size:0.85rem;padding:0.5rem 1.1rem">Gerenciar assinatura</a>
+                <a href="/gerenciar-assinatura" class="btn btn-secondary" style="font-size:0.85rem;padding:0.5rem 1.1rem">Manage subscription</a>
             </div>
             {% else %}
             <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--gray-200)">
-                <a href="/#planos" class="btn btn-gold" style="font-size:0.85rem;padding:0.5rem 1.1rem">Ver planos</a>
+                <a href="/#planos" class="btn btn-gold" style="font-size:0.85rem;padding:0.5rem 1.1rem">View plans</a>
             </div>
             {% endif %}
         </div>
 
-        <!-- Trocar senha -->
-        <h2 style="font-family:'DM Serif Display',serif;font-size:1.1rem;color:var(--navy);margin-bottom:1rem">Trocar senha</h2>
+        <h2 style="font-family:'DM Serif Display',serif;font-size:1.1rem;color:var(--navy);margin-bottom:1rem">Change password</h2>
         <form method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
-                <label>Senha atual</label>
-                <input type="password" name="senha_atual" placeholder="Sua senha atual" required>
+                <label>Current password</label>
+                <input type="password" name="senha_atual" placeholder="Your current password" required>
             </div>
             <div class="form-group">
-                <label>Nova senha</label>
-                <input type="password" name="nova_senha" placeholder="Mínimo 8 caracteres" required>
+                <label>New password</label>
+                <input type="password" name="nova_senha" placeholder="Minimum 8 characters" required>
             </div>
             <div class="form-group">
-                <label>Confirmar nova senha</label>
-                <input type="password" name="confirmar_senha" placeholder="Repita a nova senha" required>
+                <label>Confirm new password</label>
+                <input type="password" name="confirmar_senha" placeholder="Repeat new password" required>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Salvar nova senha</button>
+            <button type="submit" class="btn btn-primary btn-block">Save new password</button>
         </form>
 
         <div class="form-footer">
-            <a href="/dashboard">Voltar ao dashboard</a>
+            <a href="/dashboard">Back to dashboard</a>
         </div>
     </div>
 </div>
 
 <footer>
-    <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
+    <p>© 2026 TenderSentinel — Smart Federal Contract Monitor</p>
 </footer>
 
 </body>

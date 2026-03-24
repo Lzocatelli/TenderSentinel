@@ -75,7 +75,7 @@ def _montar_email_relatorio(nome_cliente, licitacoes, top5, total_valor):
 
     corpo = f"""<!DOCTYPE html>
 <html lang="pt-br">
-<head><meta charset="UTF-8"><title>Relatório semanal — LicitaBot</title></head>
+<head><meta charset="UTF-8"><title>Relatório semanal — TenderSentinel</title></head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;">
 <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
 
@@ -123,7 +123,7 @@ def _montar_email_relatorio(nome_cliente, licitacoes, top5, total_valor):
     <!-- Footer -->
     <div style="background:#0f1f3d;padding:18px 32px;text-align:center;border-radius:0 0 12px 12px">
         <p style="font-size:11px;color:rgba(255,255,255,0.4);margin:0;line-height:1.6">
-            Você recebe este relatório por ter um plano Profissional ou Agência no LicitaBot.<br>
+            Você recebe este relatório por ter um plano Profissional ou Agência no TenderSentinel.<br>
             <a href="{BASE_URL}/minha-conta" style="color:rgba(255,255,255,0.4)">Gerenciar conta</a>
         </p>
     </div>
@@ -206,7 +206,7 @@ def gerar_relatorio_semanal():
         top5 = licitacoes[:5]
 
         corpo = _montar_email_relatorio(nome, licitacoes, top5, total_valor)
-        assunto = "LicitaBot — Relatório semanal de oportunidades"
+        assunto = "TenderSentinel — Relatório semanal de oportunidades"
         enviar_email(email, assunto, corpo)
 
     cur.close()

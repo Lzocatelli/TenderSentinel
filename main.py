@@ -8,7 +8,7 @@ load_dotenv(override=False)
 
 
 if __name__ == "__main__":
-    print("=== LicitaBot — execução única (produção) ===")
+    print("=== TenderSentinel — execução única (produção) ===")
 
     try:
         print("\n1. Buscando licitações no portal...")
@@ -22,7 +22,7 @@ if __name__ == "__main__":
         print("\nExecução concluída com sucesso.")
 
     except Exception as e:
-        msg = f"Erro no job LicitaBot:\n\n{traceback.format_exc()}"
+        msg = f"Erro no job TenderSentinel:\n\n{traceback.format_exc()}"
         print(msg)
 
         admin_email = os.getenv("ADMIN_EMAIL")
@@ -30,7 +30,7 @@ if __name__ == "__main__":
             try:
                 enviar_email(
                     admin_email,
-                    "LicitaBot — Falha no job diário",
+                    "TenderSentinel — Falha no job diário",
                     f"<pre>{msg}</pre>",
                 )
             except Exception:

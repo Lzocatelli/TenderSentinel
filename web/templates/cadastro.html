@@ -1,24 +1,24 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Criar conta — LicitaBot</title>
+    <title>Create Account — TenderSentinel</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
 <nav>
-    <a href="/" class="nav-logo">Licita<span>Bot</span></a>
+    <a href="/" class="nav-logo">TenderSentinel</a>
     <div class="nav-links">
-        <a href="/login">Já tenho conta</a>
+        <a href="/login">I already have an account</a>
     </div>
 </nav>
 
 <div class="form-container">
     <div class="form-card">
-        <h1 class="form-title">Criar conta</h1>
-        <p class="form-subtitle">Comece a receber alertas de licitações hoje.</p>
+        <h1 class="form-title">Create Account</h1>
+        <p class="form-subtitle">Start receiving federal contract alerts today.</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
@@ -29,33 +29,33 @@
         <form method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
-                <label>Nome completo</label>
-                <input type="text" name="nome" placeholder="Seu nome" required>
+                <label>Full name</label>
+                <input type="text" name="nome" placeholder="Your name" required>
             </div>
             <div class="form-group">
-                <label>E-mail</label>
-                <input type="email" name="email" placeholder="seu@email.com" required>
+                <label>Email</label>
+                <input type="email" name="email" placeholder="you@company.com" required>
             </div>
             <div class="form-group">
-                <label>Senha</label>
-                <input type="password" name="senha" placeholder="Mínimo 8 caracteres" required>
+                <label>Password</label>
+                <input type="password" name="senha" placeholder="Minimum 8 characters" required>
             </div>
             <div class="form-group">
-                <label>Palavras-chave</label>
-                <input type="text" name="palavras_chave" placeholder="software, consultoria, TI" required>
-                <p class="hint">Separe por vírgula. Ex: software, manutenção, consultoria</p>
+                <label>Keywords</label>
+                <input type="text" name="palavras_chave" placeholder="cybersecurity, IT support, consulting" required>
+                <p class="hint">Separate with commas. We'll alert you when matching contracts are posted.</p>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Criar conta</button>
+            <button type="submit" class="btn btn-primary btn-block">Create Account</button>
         </form>
 
         <div class="form-footer">
-            Já tem conta? <a href="/login">Entrar</a>
+            Already have an account? <a href="/login">Sign in</a>
         </div>
     </div>
 </div>
 
 <footer>
-    <p>© 2026 LicitaBot — Monitor Inteligente de Licitações Públicas</p>
+    <p>© 2026 TenderSentinel — Smart Federal Contract Monitor</p>
 </footer>
 
 </body>
