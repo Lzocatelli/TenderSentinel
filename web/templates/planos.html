@@ -125,40 +125,41 @@ body { font-family: 'Work Sans', sans-serif; }
                 </a>
             </div>
 
-            <!-- Agency -->
-            <div class="bg-white rounded-2xl border {% if cliente.plano == 'agencia' %}border-orange-400 ring-2 ring-orange-400/30{% else %}border-slate-200{% endif %} p-7 flex flex-col relative">
-                {% if cliente.plano == 'agencia' %}
+            <!-- Agency (Coming Soon) -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-7 flex flex-col relative opacity-70">
                 <div class="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span class="bg-orange-500 text-white text-xs font-label font-bold px-3 py-1 rounded-full">Your plan</span>
+                    <span class="bg-slate-400 text-white text-xs font-label font-bold px-3 py-1 rounded-full">Coming Soon</span>
                 </div>
-                {% endif %}
-                <p class="font-label font-semibold text-slate-500 text-sm uppercase tracking-widest mb-2">Agency</p>
+                <p class="font-label font-semibold text-slate-400 text-sm uppercase tracking-widest mb-2">Agency</p>
                 <div class="mb-5">
-                    <span class="font-headline font-black text-4xl text-navy">$349</span>
+                    <span class="font-headline font-black text-4xl text-slate-400">$349</span>
                     <span class="text-slate-400 text-sm font-body">/mo</span>
                 </div>
                 <ul class="space-y-3 mb-8 flex-1">
-                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
-                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                    <li class="flex items-center gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base">radio_button_unchecked</span>
                         Unlimited keywords
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
-                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                    <li class="flex items-center gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base">radio_button_unchecked</span>
                         Everything in Professional
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
-                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                    <li class="flex items-center gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base">radio_button_unchecked</span>
                         Multi-client management
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
-                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
-                        Full history
+                    <li class="flex items-center gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base">radio_button_unchecked</span>
+                        Full history & analytics
+                    </li>
+                    <li class="flex items-center gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base">radio_button_unchecked</span>
+                        API access
                     </li>
                 </ul>
-                <a href="/assinar/agencia"
-                    class="block text-center py-3 rounded-xl border-2 border-navy text-navy font-headline font-bold text-sm hover:bg-navy hover:text-white transition-all">
-                    {% if cliente.plano == 'agencia' %}Current plan{% else %}Subscribe{% endif %}
-                </a>
+                <button disabled class="w-full py-3 bg-slate-100 text-slate-400 font-headline font-bold rounded-xl cursor-not-allowed text-sm">
+                    Coming Soon
+                </button>
             </div>
 
         </div>
