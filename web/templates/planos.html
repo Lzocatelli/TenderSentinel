@@ -1,88 +1,176 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="light" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plans — TenderSentinel</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Plans — TenderSentinel</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&family=Work+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+    theme: {
+        extend: {
+            fontFamily: {
+                headline: ['Inter', 'sans-serif'],
+                body: ['Work Sans', 'sans-serif'],
+                label: ['Space Grotesk', 'sans-serif'],
+            },
+            colors: { navy: '#131b2e', gold: '#fc7218' }
+        }
+    }
+}
+</script>
+<style>
+body { font-family: 'Work Sans', sans-serif; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; vertical-align: middle; }
+</style>
 </head>
-<body>
+<body class="bg-slate-50 min-h-screen flex flex-col">
 
-<nav>
-    <a href="/" class="nav-logo">TenderSentinel</a>
-    <div class="nav-links">
-        <a href="/dashboard">Dashboard</a>
-        <span style="color:rgba(255,255,255,0.6);font-size:0.9rem">{{ cliente.nome }}</span>
-        <a href="/logout">Sign out</a>
+<nav class="fixed top-0 w-full z-50 bg-navy/95 backdrop-blur border-b border-white/10">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <a href="/" class="font-headline font-black text-xl text-white tracking-tight">Tender<span class="text-gold">Sentinel</span></a>
+        <div class="flex items-center gap-5">
+            <a href="/dashboard" class="text-sm text-white/70 hover:text-white transition-colors font-label">Dashboard</a>
+            <span class="text-white/60 text-sm font-label">{{ cliente.nome }}</span>
+            <a href="/logout" class="text-sm text-white/70 hover:text-white transition-colors font-label">Sign out</a>
+        </div>
     </div>
 </nav>
 
-<div class="section" style="padding:4rem 2rem">
-    <h1 class="section-title">Choose your plan</h1>
-    <p class="section-subtitle">Monthly subscription. Cancel anytime from the Stripe portal.</p>
-
-    {% if cliente.plano %}
-    <p style="text-align:center;margin-bottom:2rem;color:var(--gray-500)">
-        Current plan: <strong style="color:var(--navy);text-transform:capitalize">{{ cliente.plano }}</strong>
-    </p>
-    {% endif %}
-
-    <div class="plans-grid">
-        <div class="plan-card {% if cliente.plano == 'basico' %}featured{% endif %}">
-            {% if cliente.plano == 'basico' %}<div class="plan-badge">Your plan</div>{% endif %}
-            <p class="plan-name">Basic</p>
-            <p class="plan-price">$49<span>/mo</span></p>
-            <ul class="plan-features">
-                <li>5 keywords monitored</li>
-                <li>Daily email alerts</li>
-                <li>Dashboard access</li>
-            </ul>
-            <a href="/assinar/basico" class="btn btn-primary btn-block">
-                {% if cliente.plano == 'basico' %}Current plan{% else %}Subscribe{% endif %}
-            </a>
+<div class="pt-24 pb-16 px-4">
+    <div class="max-w-5xl mx-auto">
+        <div class="text-center mb-12">
+            <h1 class="font-headline font-black text-4xl text-navy mb-3">Choose your plan</h1>
+            <p class="text-slate-500 font-body">Monthly subscription. Cancel anytime from the Stripe portal.</p>
+            {% if cliente.plano %}
+            <p class="mt-3 text-sm text-slate-400 font-label">
+                Current plan: <span class="font-bold text-navy capitalize">{{ cliente.plano }}</span>
+            </p>
+            {% endif %}
         </div>
 
-        <div class="plan-card featured">
-            <div class="plan-badge">Most popular</div>
-            {% if cliente.plano == 'profissional' %}<div class="plan-badge" style="top:2.5rem">Your plan</div>{% endif %}
-            <p class="plan-name">Professional</p>
-            <p class="plan-price">$149<span>/mo</span></p>
-            <ul class="plan-features">
-                <li>20 keywords monitored</li>
-                <li>Daily email alerts</li>
-                <li>Weekly opportunity report</li>
-                <li>Opportunity score (0–10)</li>
-                <li>Dashboard access</li>
-            </ul>
-            <a href="/assinar/profissional" class="btn btn-gold btn-block">
-                {% if cliente.plano == 'profissional' %}Current plan{% else %}Subscribe{% endif %}
-            </a>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            <!-- Basic -->
+            <div class="bg-white rounded-2xl border {% if cliente.plano == 'basico' %}border-orange-400 ring-2 ring-orange-400/30{% else %}border-slate-200{% endif %} p-7 flex flex-col relative">
+                {% if cliente.plano == 'basico' %}
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span class="bg-orange-500 text-white text-xs font-label font-bold px-3 py-1 rounded-full">Your plan</span>
+                </div>
+                {% endif %}
+                <p class="font-label font-semibold text-slate-500 text-sm uppercase tracking-widest mb-2">Basic</p>
+                <div class="mb-5">
+                    <span class="font-headline font-black text-4xl text-navy">$49</span>
+                    <span class="text-slate-400 text-sm font-body">/mo</span>
+                </div>
+                <ul class="space-y-3 mb-8 flex-1">
+                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        5 keywords monitored
+                    </li>
+                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        Daily email alerts
+                    </li>
+                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        Dashboard access
+                    </li>
+                </ul>
+                <a href="/assinar/basico"
+                    class="block text-center py-3 rounded-xl border-2 border-navy text-navy font-headline font-bold text-sm hover:bg-navy hover:text-white transition-all">
+                    {% if cliente.plano == 'basico' %}Current plan{% else %}Subscribe{% endif %}
+                </a>
+            </div>
+
+            <!-- Professional (featured) -->
+            <div class="bg-navy rounded-2xl border border-navy p-7 flex flex-col relative shadow-xl scale-[1.02]">
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span class="bg-gold text-white text-xs font-label font-bold px-3 py-1 rounded-full">
+                        {% if cliente.plano == 'profissional' %}Your plan{% else %}Most popular{% endif %}
+                    </span>
+                </div>
+                <p class="font-label font-semibold text-white/50 text-sm uppercase tracking-widest mb-2">Professional</p>
+                <div class="mb-5">
+                    <span class="font-headline font-black text-4xl text-white">$149</span>
+                    <span class="text-white/40 text-sm font-body">/mo</span>
+                </div>
+                <ul class="space-y-3 mb-8 flex-1">
+                    <li class="flex items-center gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        20 keywords monitored
+                    </li>
+                    <li class="flex items-center gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        Daily email alerts
+                    </li>
+                    <li class="flex items-center gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        Weekly opportunity report
+                    </li>
+                    <li class="flex items-center gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        Relevance score (0–10)
+                    </li>
+                    <li class="flex items-center gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        NAICS + set-aside matching
+                    </li>
+                </ul>
+                <a href="/assinar/profissional"
+                    class="block text-center py-3 rounded-xl bg-gold text-white font-headline font-bold text-sm hover:bg-orange-600 transition-all">
+                    {% if cliente.plano == 'profissional' %}Current plan{% else %}Subscribe{% endif %}
+                </a>
+            </div>
+
+            <!-- Agency -->
+            <div class="bg-white rounded-2xl border {% if cliente.plano == 'agencia' %}border-orange-400 ring-2 ring-orange-400/30{% else %}border-slate-200{% endif %} p-7 flex flex-col relative">
+                {% if cliente.plano == 'agencia' %}
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span class="bg-orange-500 text-white text-xs font-label font-bold px-3 py-1 rounded-full">Your plan</span>
+                </div>
+                {% endif %}
+                <p class="font-label font-semibold text-slate-500 text-sm uppercase tracking-widest mb-2">Agency</p>
+                <div class="mb-5">
+                    <span class="font-headline font-black text-4xl text-navy">$299</span>
+                    <span class="text-slate-400 text-sm font-body">/mo</span>
+                </div>
+                <ul class="space-y-3 mb-8 flex-1">
+                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        Unlimited keywords
+                    </li>
+                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        Everything in Professional
+                    </li>
+                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        Multi-client management
+                    </li>
+                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        Full history
+                    </li>
+                </ul>
+                <a href="/assinar/agencia"
+                    class="block text-center py-3 rounded-xl border-2 border-navy text-navy font-headline font-bold text-sm hover:bg-navy hover:text-white transition-all">
+                    {% if cliente.plano == 'agencia' %}Current plan{% else %}Subscribe{% endif %}
+                </a>
+            </div>
+
         </div>
 
-        <div class="plan-card {% if cliente.plano == 'agencia' %}featured{% endif %}">
-            {% if cliente.plano == 'agencia' %}<div class="plan-badge">Your plan</div>{% endif %}
-            <p class="plan-name">Agency</p>
-            <p class="plan-price">$299<span>/mo</span></p>
-            <ul class="plan-features">
-                <li>Unlimited keywords</li>
-                <li>Everything in Professional</li>
-                <li>Multi-client management</li>
-                <li>Full history</li>
-            </ul>
-            <a href="/assinar/agencia" class="btn btn-primary btn-block">
-                {% if cliente.plano == 'agencia' %}Current plan{% else %}Subscribe{% endif %}
-            </a>
-        </div>
+        <p class="text-center mt-8 text-xs text-slate-400 font-label">
+            Secure payment via Stripe. You'll be redirected to checkout to complete your subscription.
+        </p>
     </div>
-
-    <p style="text-align:center;margin-top:2rem;font-size:0.85rem;color:var(--gray-500)">
-        Secure payment via Stripe. You'll be redirected to checkout to complete your subscription.
-    </p>
 </div>
 
-<footer>
-    <p>© 2026 TenderSentinel — Smart Federal Contract Monitor</p>
+<footer class="text-center py-6 text-xs text-slate-400 font-label">
+    © 2026 TenderSentinel — Smart Federal Contract Monitor
 </footer>
-
 </body>
 </html>

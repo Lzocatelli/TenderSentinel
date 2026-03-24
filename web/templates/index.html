@@ -310,15 +310,33 @@
 <!-- Pricing -->
 <section class="py-24 bg-surface" id="planos">
 <div class="max-w-7xl mx-auto px-6">
-    <div class="text-center mb-16 reveal">
+    <div class="text-center mb-12 reveal">
         <h2 class="font-headline text-4xl font-extrabold tracking-tight mb-4">Flexible Intelligence Packages.</h2>
         <p class="text-on-surface-variant max-w-2xl mx-auto">7-day free trial on all plans. Cancel anytime.</p>
+
+        <!-- Billing toggle -->
+        <div class="inline-flex items-center gap-4 mt-8 bg-surface-container-low rounded-full px-6 py-3 border border-outline-variant/30">
+            <span id="label-mensal" class="font-label text-sm font-semibold text-on-surface">Monthly</span>
+            <button id="billing-toggle" onclick="toggleBilling()"
+                class="relative w-12 h-6 rounded-full transition-colors duration-300 bg-outline-variant focus:outline-none"
+                aria-pressed="false" role="switch">
+                <span id="toggle-dot" class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300"></span>
+            </button>
+            <span id="label-anual" class="font-label text-sm font-medium text-on-surface-variant flex items-center gap-2">
+                Annual
+                <span id="save-badge" class="hidden bg-secondary text-white text-[10px] font-label font-bold px-2 py-0.5 rounded-full">Save 20%</span>
+            </span>
+        </div>
     </div>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+    <div id="pricing-grid" class="grid grid-cols-1 md:grid-cols-3 gap-8" data-periodo="mensal">
         <!-- Basic -->
         <div class="bg-surface-container-low rounded-xl p-8 border border-transparent hover:border-outline-variant/30 transition-all reveal reveal-delay-1">
             <div class="font-label text-xs uppercase font-bold text-on-surface-variant mb-2">Basic</div>
-            <div class="mb-6"><span class="font-headline text-4xl font-black">$49</span><span class="text-on-surface-variant font-label text-sm">/mo</span></div>
+            <div class="mb-6">
+                <span class="font-headline text-4xl font-black price-display" data-monthly="$49" data-annual="$39">$49</span>
+                <span class="text-on-surface-variant font-label text-sm">/mo</span>
+                <span class="annual-note hidden text-xs text-secondary font-label ml-1">billed $468/yr</span>
+            </div>
             <p class="text-sm text-on-surface-variant mb-8">Ideal for small businesses entering federal contracting.</p>
             <ul class="space-y-4 mb-8">
                 <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>5 keywords monitored</li>
@@ -332,7 +350,11 @@
         <div class="bg-primary text-white rounded-xl p-8 shadow-2xl relative overflow-hidden transform scale-105 z-10 reveal reveal-delay-2">
             <div class="absolute top-0 right-0 bg-secondary text-white font-label text-[10px] font-bold py-1 px-4 rounded-bl-lg">MOST POPULAR</div>
             <div class="font-label text-xs uppercase font-bold text-on-primary-container mb-2">Professional</div>
-            <div class="mb-6"><span class="font-headline text-4xl font-black">$149</span><span class="text-on-primary-container font-label text-sm">/mo</span></div>
+            <div class="mb-6">
+                <span class="font-headline text-4xl font-black price-display" data-monthly="$149" data-annual="$119">$149</span>
+                <span class="text-on-primary-container font-label text-sm">/mo</span>
+                <span class="annual-note hidden text-xs font-label ml-1" style="color:#ffb692">billed $1,428/yr</span>
+            </div>
             <p class="text-sm text-on-primary-container mb-8">For growing contractors pursuing national-scale opportunities.</p>
             <ul class="space-y-4 mb-8">
                 <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-secondary-container text-lg">check</span>20 keywords monitored</li>
@@ -347,7 +369,11 @@
         <!-- Agency -->
         <div class="bg-surface-container-low rounded-xl p-8 border border-transparent hover:border-outline-variant/30 transition-all reveal reveal-delay-3">
             <div class="font-label text-xs uppercase font-bold text-on-surface-variant mb-2">Agency</div>
-            <div class="mb-6"><span class="font-headline text-4xl font-black">$299</span><span class="text-on-surface-variant font-label text-sm">/mo</span></div>
+            <div class="mb-6">
+                <span class="font-headline text-4xl font-black price-display" data-monthly="$299" data-annual="$239">$299</span>
+                <span class="text-on-surface-variant font-label text-sm">/mo</span>
+                <span class="annual-note hidden text-xs text-secondary font-label ml-1">billed $2,868/yr</span>
+            </div>
             <p class="text-sm text-on-surface-variant mb-8">Full-suite intelligence for primes and consulting firms.</p>
             <ul class="space-y-4 mb-8">
                 <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>Unlimited keywords</li>
@@ -493,10 +519,54 @@ async function updateCounter() {
 updateCounter();
 setInterval(updateCounter, 5 * 60 * 1000);
 
+// Billing toggle
+let billingAnual = false;
+
+function toggleBilling() {
+    billingAnual = !billingAnual;
+    const btn = document.getElementById('billing-toggle');
+    const dot = document.getElementById('toggle-dot');
+    const badge = document.getElementById('save-badge');
+    const labelAnual = document.getElementById('label-anual');
+    const labelMensal = document.getElementById('label-mensal');
+    const grid = document.getElementById('pricing-grid');
+
+    if (billingAnual) {
+        btn.classList.replace('bg-outline-variant', 'bg-secondary');
+        btn.setAttribute('aria-pressed', 'true');
+        dot.style.transform = 'translateX(24px)';
+        badge.classList.remove('hidden');
+        labelAnual.classList.replace('text-on-surface-variant', 'text-on-surface');
+        labelAnual.classList.replace('font-medium', 'font-semibold');
+        labelMensal.classList.replace('text-on-surface', 'text-on-surface-variant');
+        labelMensal.classList.replace('font-semibold', 'font-medium');
+        grid.dataset.periodo = 'anual';
+    } else {
+        btn.classList.replace('bg-secondary', 'bg-outline-variant');
+        btn.setAttribute('aria-pressed', 'false');
+        dot.style.transform = 'translateX(0)';
+        badge.classList.add('hidden');
+        labelMensal.classList.replace('text-on-surface-variant', 'text-on-surface');
+        labelMensal.classList.replace('font-medium', 'font-semibold');
+        labelAnual.classList.replace('text-on-surface', 'text-on-surface-variant');
+        labelAnual.classList.replace('font-semibold', 'font-medium');
+        grid.dataset.periodo = 'mensal';
+    }
+
+    // Update displayed prices
+    document.querySelectorAll('.price-display').forEach(el => {
+        el.textContent = billingAnual ? el.dataset.annual : el.dataset.monthly;
+    });
+    document.querySelectorAll('.annual-note').forEach(el => {
+        el.classList.toggle('hidden', !billingAnual);
+    });
+}
+
 // Plan subscription
 function assinar(plano) {
+    const periodo = document.getElementById('pricing-grid')?.dataset.periodo || 'mensal';
 {% if current_user.is_authenticated %}
-    window.location.href = `/assinar/${plano}`;
+    window.location.href = `/assinar/${plano}?periodo=${periodo}`;
 {% else %}
     window.location.href = `/cadastro`;
 {% endif %}
