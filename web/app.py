@@ -2,88 +2,140 @@ import csv
 import hmac
 import html as html_lib
 import io
+import logging
 import os
+import re
 import secrets
 import time
+import threading
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from threading import Thread
 
 import frontmatter
 import markdown as md_lib
-
 import requests
 import stripe
 from dotenv import load_dotenv
 from flask import (Flask, Response, abort, flash, jsonify, redirect,
                    render_template, request, session, url_for)
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
                          login_user, logout_user)
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 
-from app.alertas import enviar_email
-from app.database import conectar
-from app.utils import formatar_moeda, limite_palavras
+from app.alertas import send_email
+from app.config import (BASE_URL, DASHBOARD_LIMIT, CSV_EXPORT_LIMIT,
+                        COUNTER_CACHE_TTL_MINUTES, TRIAL_PERIOD_DAYS,
+                        VALID_SET_ASIDES, PLAN_LIMITS, FREE_KEYWORD_LIMIT)
+from app.database import get_connection, release_connection
+from app.score import calcular_score
+from app.utils import format_currency, keyword_limit
 
 load_dotenv(override=False)
 
-# ── Configuração da aplicação ─────────────────────────────────────────────────
+logger = logging.getLogger("tendersentinel.web")
+
+# ── App Configuration ────────────────────────────────────────────────────────
 
 secret_key = os.getenv("SECRET_KEY")
 if not secret_key:
     secret_key = secrets.token_urlsafe(32)
     if os.getenv("FLASK_ENV") != "production":
-        print(
-            "WARNING: SECRET_KEY não definido; usando chave temporária. "
-            "Defina SECRET_KEY no ambiente em produção."
+        logger.warning(
+            "SECRET_KEY not set; using temporary key. "
+            "Set SECRET_KEY in environment for production."
         )
 
 app = Flask(__name__)
 app.secret_key = secret_key
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
-    REMEMBER_COOKIE_DURATION=timedelta(days=30),
+    SESSION_COOKIE_SAMESITE="Strict",
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
-app.permanent_session_lifetime = timedelta(days=30)
+
+# HTTPS redirect for production (Q10)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+
+if os.getenv("FLASK_ENV") == "production":
+    @app.before_request
+    def redirect_to_https():
+        if request.scheme == "http":
+            url = request.url.replace("http://", "https://", 1)
+            return redirect(url, code=301)
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-# ── Login ─────────────────────────────────────────────────────────────────────
+# ── Startup env var validation (Q40) ─────────────────────────────────────────
+
+if os.getenv("FLASK_ENV") == "production":
+    _required_env = ["DATABASE_URL", "SECRET_KEY", "STRIPE_SECRET_KEY"]
+    _missing_env = [v for v in _required_env if not os.getenv(v)]
+    if _missing_env:
+        logger.error(f"Missing required environment variables: {', '.join(_missing_env)}")
+
+# ── Rate Limiter (Q6, Q42) ──────────────────────────────────────────────────
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://",
+)
+
+# ── Login Manager ────────────────────────────────────────────────────────────
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
 
-@app.context_processor
-def inject_globals():
-    return {"now": datetime.utcnow()}
-
-
-class Cliente(UserMixin):
-    def __init__(self, id, nome, email, palavras_chave, plano=None, naics_codes=None, set_asides=None):
+class Client(UserMixin):
+    def __init__(self, id, name, email, keywords, plan=None, naics_codes=None, set_asides=None):
         self.id = id
-        self.nome = nome
+        self.name = name
         self.email = email
-        self.palavras_chave = palavras_chave or []
-        self.plano = plano
+        self.keywords = keywords or []
+        self.plan = plan
         self.naics_codes = naics_codes or []
         self.set_asides = set_asides or []
 
     @property
-    def limite_palavras(self):
-        return limite_palavras(self.plano)
+    def keyword_limit(self):
+        return keyword_limit(self.plan)
+
+    @property
+    def has_paid_plan(self):
+        return self.plan in ("basico", "profissional", "agencia")
+
+    # Legacy aliases
+    @property
+    def nome(self):
+        return self.name
+
+    @property
+    def palavras_chave(self):
+        return self.keywords
+
+    @property
+    def plano(self):
+        return self.plan
 
     @property
     def plano_pago(self):
-        return self.plano in ("basico", "profissional", "agencia")
+        return self.has_paid_plan
+
+    @property
+    def limite_palavras(self):
+        return self.keyword_limit
 
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = conectar()
+    conn = get_connection()
     cur = conn.cursor()
     cur.execute(
         "SELECT id, nome, email, palavras_chave, plano, naics_codes, set_asides FROM clientes WHERE id = %s",
@@ -91,11 +143,11 @@ def load_user(user_id):
     )
     row = cur.fetchone()
     cur.close()
-    conn.close()
-    return Cliente(*row) if row else None
+    release_connection(conn)
+    return Client(*row) if row else None
 
 
-# ── CSRF ──────────────────────────────────────────────────────────────────────
+# ── CSRF ─────────────────────────────────────────────────────────────────────
 
 def _get_csrf_token():
     token = session.get("_csrf_token")
@@ -109,10 +161,11 @@ app.jinja_env.globals["csrf_token"] = _get_csrf_token
 
 
 @app.before_request
-def verificar_csrf():
+def verify_csrf():
     if request.method not in ("POST", "PUT", "DELETE"):
         return
-    if (request.endpoint or "") in {"api_contador", "health", "webhook_stripe"}:
+    if (request.endpoint or "") in {"api_counter", "health", "webhook_stripe",
+                                     "blog_preview_api", "api_contador"}:
         return
     token_form = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
     token_session = session.get("_csrf_token")
@@ -120,107 +173,139 @@ def verificar_csrf():
         abort(400)
 
 
-# ── Filtro Jinja ──────────────────────────────────────────────────────────────
+# ── Jinja Filters ────────────────────────────────────────────────────────────
 
-@app.template_filter("moeda")
-def moeda_filter(valor):
-    if not valor:
+@app.template_filter("currency")
+def currency_filter(value):
+    if not value:
         return "—"
     try:
-        return f"${float(valor):,.2f}"
+        return f"${float(value):,.2f}"
     except Exception:
         return "—"
 
-
-# ── Contador com cache ────────────────────────────────────────────────────────
-
-_cache_contador = {"total": 0, "atualizado_em": None}
+# Legacy filter name
+app.jinja_env.filters["moeda"] = currency_filter
 
 
-def contar_licitacoes_hoje():
-    agora = datetime.utcnow()
-    if _cache_contador["atualizado_em"] and agora - _cache_contador["atualizado_em"] < timedelta(minutes=5):
-        return _cache_contador["total"]
+# ── Counter Cache ────────────────────────────────────────────────────────────
+
+_counter_cache = {"total": 0, "updated_at": None}
+
+
+def count_opportunities_today():
+    now = datetime.utcnow()
+    if (_counter_cache["updated_at"] and
+            now - _counter_cache["updated_at"] < timedelta(minutes=COUNTER_CACHE_TTL_MINUTES)):
+        return _counter_cache["total"]
 
     try:
-        conn = conectar()
+        conn = get_connection()
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM licitacoes WHERE data_publicacao = CURRENT_DATE")
         total = cur.fetchone()[0] or 0
         cur.close()
-        conn.close()
+        release_connection(conn)
     except Exception:
         total = 0
 
-    _cache_contador["total"] = total
-    _cache_contador["atualizado_em"] = agora
+    _counter_cache["total"] = total
+    _counter_cache["updated_at"] = now
     return total
 
 
-# ── Rotas públicas ────────────────────────────────────────────────────────────
+# ── Email validation helper (Q5) ─────────────────────────────────────────────
+
+_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
+
+
+def _is_valid_email(email):
+    return bool(_EMAIL_RE.match(email))
+
+
+# ── Manual search lock (Q28) ─────────────────────────────────────────────────
+
+_search_lock = threading.Lock()
+
+
+# ── Public Routes ────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
-    return render_template("index.html", total_hoje=contar_licitacoes_hoje())
+    return render_template("index.html", total_hoje=count_opportunities_today())
 
 
 @app.route("/api/contador")
 def api_contador():
-    return jsonify({"total": contar_licitacoes_hoje()})
+    return jsonify({"total": count_opportunities_today()})
 
 
 @app.route("/health")
 def health():
     try:
-        conn = conectar()
+        conn = get_connection()
         cur = conn.cursor()
         cur.execute("SELECT 1")
         cur.close()
-        conn.close()
+        release_connection(conn)
         return jsonify({"status": "ok", "database": "ok"}), 200
     except Exception:
         return jsonify({"status": "error", "database": "unavailable"}), 503
 
 
-# ── Auth ──────────────────────────────────────────────────────────────────────
+# ── Auth ─────────────────────────────────────────────────────────────────────
 
-@app.route("/cadastro", methods=["GET", "POST"])
-def cadastro():
+@app.route("/signup", methods=["GET", "POST"])
+@limiter.limit("10/minute")
+def signup():
     if request.method == "POST":
-        nome = request.form.get("nome", "").strip()
+        name = request.form.get("nome", "").strip()
         email = request.form.get("email", "").strip().lower()
-        senha = request.form.get("senha", "")
-        palavras = request.form.get("palavras_chave", "")
-        palavras_lista = [p.strip() for p in palavras.split(",") if p.strip()]
+        password = request.form.get("senha", "")
+        keywords_raw = request.form.get("palavras_chave", "")
+        keywords_list = [p.strip() for p in keywords_raw.split(",") if p.strip()]
 
-        limite_free = limite_palavras(None)
-        if len(palavras_lista) > limite_free:
-            flash(f"The free plan allows up to {limite_free} keyword. The first one was saved.", "info")
-            palavras_lista = palavras_lista[:limite_free]
+        # Validation (Q4, Q5)
+        if not name or not email or not password:
+            flash("Please fill in all fields.", "erro")
+            return render_template("cadastro.html")
 
-        conn = conectar()
+        if not _is_valid_email(email):
+            flash("Please enter a valid email address.", "erro")
+            return render_template("cadastro.html")
+
+        if len(password) < 8:
+            flash("Password must be at least 8 characters.", "erro")
+            return render_template("cadastro.html")
+
+        limit = keyword_limit(None)
+        if len(keywords_list) > limit:
+            flash(f"The free plan allows up to {limit} keyword. The first one was saved.", "info")
+            keywords_list = keywords_list[:limit]
+
+        conn = get_connection()
         cur = conn.cursor()
         cur.execute("SELECT id FROM clientes WHERE email = %s", (email,))
         if cur.fetchone():
             flash("Email already registered.", "erro")
             cur.close()
-            conn.close()
+            release_connection(conn)
             return render_template("cadastro.html")
 
         cur.execute(
             "INSERT INTO clientes (nome, email, senha, palavras_chave, ativo) VALUES (%s, %s, %s, %s, TRUE)",
-            (nome, email, generate_password_hash(senha), palavras_lista),
+            (name, email, generate_password_hash(password), keywords_list),
         )
         conn.commit()
         cur.close()
-        conn.close()
+        release_connection(conn)
 
-        enviar_email(email, "Welcome to TenderSentinel!", f"""
+        send_email(email, "Welcome to TenderSentinel!", f"""
         <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
             <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
-            <h2>Welcome, {html_lib.escape(nome)}!</h2>
+            <h2>Welcome, {html_lib.escape(name)}!</h2>
             <p>Your account is ready. You'll receive alerts for:
-               <strong>{html_lib.escape(', '.join(palavras_lista))}</strong></p>
+               <strong>{html_lib.escape(', '.join(keywords_list))}</strong></p>
         </div>
         """)
         flash("Account created! Check your email.", "sucesso")
@@ -228,14 +313,18 @@ def cadastro():
 
     return render_template("cadastro.html")
 
+# Legacy route alias
+app.add_url_rule("/cadastro", endpoint="cadastro", view_func=signup)
+
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("10/minute")
 def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
-        senha = request.form.get("senha", "")
+        password = request.form.get("senha", "")
 
-        conn = conectar()
+        conn = get_connection()
         cur = conn.cursor()
         cur.execute(
             "SELECT id, nome, email, palavras_chave, senha, plano FROM clientes WHERE email = %s",
@@ -243,10 +332,10 @@ def login():
         )
         row = cur.fetchone()
         cur.close()
-        conn.close()
+        release_connection(conn)
 
-        if row and check_password_hash(row[4], senha):
-            login_user(Cliente(row[0], row[1], row[2], row[3], row[5]), remember=True)
+        if row and check_password_hash(row[4], password):
+            login_user(Client(row[0], row[1], row[2], row[3], row[5]), remember=True)
             return redirect(url_for("dashboard"))
 
         flash("Incorrect email or password.", "erro")
@@ -261,58 +350,57 @@ def logout():
     return redirect(url_for("index"))
 
 
-# ── Dashboard ─────────────────────────────────────────────────────────────────
+# ── Dashboard ────────────────────────────────────────────────────────────────
 
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    plano_pago = current_user.plano_pago
-    valor_min = request.args.get("valor_min", type=float) if plano_pago else None
-    uf = request.args.get("uf", "").strip().upper() or None if plano_pago else None
+    paid = current_user.has_paid_plan
+    valor_min = request.args.get("valor_min", type=float) if paid else None
+    uf = request.args.get("uf", "").strip().upper() or None if paid else None
 
-    palavras = current_user.palavras_chave or []
-    if not palavras:
+    keywords = current_user.keywords or []
+    if not keywords:
         return render_template(
             "dashboard.html",
             licitacoes=[],
             cliente=current_user,
-            show_score=plano_pago,
+            show_score=paid,
             valor_min=valor_min or "",
             uf_selecionada=uf or "",
         )
 
-    filtros_kw = " OR ".join(["l.objeto ILIKE %s"] * len(palavras))
-    params_kw = [f"%{p}%" for p in palavras]
+    filters_sql = " OR ".join(["l.objeto ILIKE %s"] * len(keywords))
+    params_kw = [f"%{kw}%" for kw in keywords]
 
-    conn = conectar()
+    conn = get_connection()
     cur = conn.cursor()
     cur.execute(f"""
         SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link, l.naics_code, l.set_aside
         FROM licitacoes l
-        WHERE ({filtros_kw})
+        WHERE ({filters_sql})
           AND (%s IS NULL OR l.valor >= %s)
           AND (%s IS NULL OR l.uf = %s)
         ORDER BY l.data_publicacao DESC
-        LIMIT 50
+        LIMIT {DASHBOARD_LIMIT}
     """, params_kw + [valor_min, valor_min, uf, uf])
 
     rows = cur.fetchall()
     cur.close()
-    conn.close()
+    release_connection(conn)
 
-    if plano_pago:
-        from app.score import calcular_score
+    if paid:
         licitacoes = []
         for row in rows:
-            orgao, objeto, valor, data, link, naics_code, set_aside = row
+            agency, title, value, posted, link, naics_code, set_aside = row
             score = calcular_score(
-                objeto, palavras, valor,
+                title, keywords, value,
                 naics_code=naics_code,
                 user_naics=current_user.naics_codes,
                 set_aside=set_aside,
                 user_set_asides=current_user.set_asides,
             )
-            licitacoes.append((orgao, objeto, valor, data, link, score))
+            licitacoes.append((agency, title, value, posted, link, score))
         licitacoes.sort(key=lambda x: x[5], reverse=True)
     else:
         licitacoes = [row[:5] for row in rows]
@@ -321,258 +409,258 @@ def dashboard():
         "dashboard.html",
         licitacoes=licitacoes,
         cliente=current_user,
-        show_score=plano_pago,
+        show_score=paid,
         valor_min=valor_min or "",
         uf_selecionada=uf or "",
     )
 
 
-# ── Busca manual ──────────────────────────────────────────────────────────────
+# ── Manual Search ────────────────────────────────────────────────────────────
 
-@app.route("/buscar-agora", methods=["POST"])
+@app.route("/search-now", methods=["POST"])
 @login_required
-def buscar_agora():
-    if not current_user.plano_pago:
+def search_now():
+    if not current_user.has_paid_plan:
         flash("Manual search is available on paid plans. You'll receive automatic alerts at 9am.", "info")
         return redirect(url_for("dashboard"))
 
-    cliente_id = current_user.id
-    cliente_email = current_user.email
-    cliente_palavras = current_user.palavras_chave
+    client_id = current_user.id
+    client_email = current_user.email
+    client_keywords = current_user.keywords
 
-    def _rodar(cliente_id, cliente_email, cliente_palavras):
-        from app.scraper import buscar_licitacoes, salvar_licitacoes
+    def _run(cid, cemail, ckeywords):
+        if not _search_lock.acquire(blocking=False):
+            logger.info("Manual search already running, skipping")
+            return
 
-        licitacoes = buscar_licitacoes()
-        salvar_licitacoes(licitacoes)
-
-        conn = conectar()
-        cur = conn.cursor()
         try:
-            # Busca novas licitações para as palavras do cliente
-            filtros = " OR ".join(["l.objeto ILIKE %s"] * len(cliente_palavras))
-            params = [f"%{p}%" for p in cliente_palavras]
-            cur.execute(f"""
-                SELECT l.id, l.sam_id, l.orgao, l.objeto, l.valor, l.link
-                FROM licitacoes l
-                WHERE {filtros}
-            """, params)
-            candidatas = cur.fetchall()
+            from app.scraper import fetch_opportunities, save_opportunities
+            opportunities = fetch_opportunities()
+            save_opportunities(opportunities)
 
-            ids = [l[0] for l in candidatas]
-            cur.execute(
-                "SELECT licitacao_id FROM alertas_enviados WHERE cliente_id = %s AND licitacao_id = ANY(%s)",
-                (cliente_id, ids),
-            )
-            ja_enviados = {row[0] for row in cur.fetchall()}
-            novas = [l for l in candidatas if l[0] not in ja_enviados]
+            conn = get_connection()
+            cur = conn.cursor()
+            try:
+                filters = " OR ".join(["l.objeto ILIKE %s"] * len(ckeywords))
+                params = [f"%{kw}%" for kw in ckeywords]
+                cur.execute(f"""
+                    SELECT l.id, l.sam_id, l.orgao, l.objeto, l.valor, l.link
+                    FROM licitacoes l
+                    WHERE {filters}
+                """, params)
+                candidates = cur.fetchall()
 
-            if novas:
-                from app.alertas import _montar_card_licitacao
-                cards = "".join(_montar_card_licitacao(l[2], l[3], l[4], l[5]) for l in novas)
-                corpo = f"""
-                <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-                    <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
-                    <p style="color:#64748b;margin-bottom:1.5rem">{len(novas)} nova(s) licitação(ões) encontradas!</p>
-                    {cards}
-                </div>
-                """
-                enviar_email(
-                    cliente_email,
-                    f"TenderSentinel — {len(novas)} nova(s) licitação(ões) encontradas!",
-                    corpo,
+                ids = [c[0] for c in candidates]
+                cur.execute(
+                    "SELECT licitacao_id FROM alertas_enviados WHERE cliente_id = %s AND licitacao_id = ANY(%s)",
+                    (cid, ids),
                 )
-                cur.executemany(
-                    "INSERT INTO alertas_enviados (cliente_id, licitacao_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                    [(cliente_id, l[0]) for l in novas],
-                )
+                already_sent = {row[0] for row in cur.fetchall()}
+                new_matches = [c for c in candidates if c[0] not in already_sent]
 
-            conn.commit()
-        except Exception as e:
-            print(f"Erro buscar_agora: {e}")
-            conn.rollback()
+                if new_matches:
+                    from app.alertas import _build_opportunity_card
+                    cards = "".join(_build_opportunity_card(m[2], m[3], m[4], m[5]) for m in new_matches)
+                    count = len(new_matches)
+                    plural = "opportunity" if count == 1 else "opportunities"
+                    body = f"""
+                    <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
+                        <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
+                        <p style="color:#64748b;margin-bottom:1.5rem">{count} new {plural} found!</p>
+                        {cards}
+                    </div>
+                    """
+                    send_email(cemail, f"TenderSentinel — {count} new {plural} found!", body)
+                    cur.executemany(
+                        "INSERT INTO alertas_enviados (cliente_id, licitacao_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                        [(cid, m[0]) for m in new_matches],
+                    )
+
+                conn.commit()
+            except Exception as e:
+                logger.error(f"Manual search error: {e}")
+                conn.rollback()
+            finally:
+                cur.close()
+                release_connection(conn)
         finally:
-            cur.close()
-            conn.close()
+            _search_lock.release()
 
-    Thread(target=_rodar, args=(cliente_id, cliente_email, cliente_palavras), daemon=True).start()
+    threading.Thread(target=_run, args=(client_id, client_email, client_keywords), daemon=True).start()
     flash("Search started! If we find new matches, you'll receive an email shortly.", "info")
     return redirect(url_for("dashboard"))
 
+# Legacy route alias
+app.add_url_rule("/buscar-agora", endpoint="buscar_agora", view_func=search_now, methods=["POST"])
 
-# ── Minha Conta ───────────────────────────────────────────────────────────────
 
-@app.route("/minha-conta", methods=["GET", "POST"])
+# ── My Account ───────────────────────────────────────────────────────────────
+
+@app.route("/my-account", methods=["GET", "POST"])
 @login_required
-def minha_conta():
-    renovacao = None
-    if current_user.plano_pago:
+def my_account():
+    renewal_date = None
+    if current_user.has_paid_plan:
         try:
-            conn = conectar()
+            conn = get_connection()
             cur = conn.cursor()
             cur.execute("SELECT stripe_subscription_id FROM clientes WHERE id = %s", (current_user.id,))
             row = cur.fetchone()
             cur.close()
-            conn.close()
+            release_connection(conn)
             if row and row[0]:
                 sub = stripe.Subscription.retrieve(row[0])
-                renovacao = datetime.fromtimestamp(sub.current_period_end).strftime("%d/%m/%Y")
+                renewal_date = datetime.fromtimestamp(sub.current_period_end).strftime("%B %d, %Y")
         except Exception:
             pass
 
     if request.method == "POST":
-        senha_atual = request.form.get("senha_atual", "")
-        nova_senha = request.form.get("nova_senha", "")
-        confirmar = request.form.get("confirmar_senha", "")
+        current_password = request.form.get("senha_atual", "")
+        new_password = request.form.get("nova_senha", "")
+        confirm_password = request.form.get("confirmar_senha", "")
 
-        conn = conectar()
+        conn = get_connection()
         cur = conn.cursor()
         cur.execute("SELECT senha FROM clientes WHERE id = %s", (current_user.id,))
         row = cur.fetchone()
 
-        if not row or not check_password_hash(row[0], senha_atual):
+        if not row or not check_password_hash(row[0], current_password):
             flash("Current password is incorrect.", "erro")
-        elif len(nova_senha) < 8:
+        elif len(new_password) < 8:
             flash("New password must be at least 8 characters.", "erro")
-        elif nova_senha != confirmar:
+        elif new_password != confirm_password:
             flash("Passwords do not match.", "erro")
         else:
             cur.execute(
                 "UPDATE clientes SET senha = %s WHERE id = %s",
-                (generate_password_hash(nova_senha), current_user.id),
+                (generate_password_hash(new_password), current_user.id),
             )
             conn.commit()
             flash("Password updated successfully!", "sucesso")
 
         cur.close()
-        conn.close()
+        release_connection(conn)
 
-    return render_template("minha_conta.html", cliente=current_user, renovacao=renovacao)
+    return render_template("minha_conta.html", cliente=current_user, renovacao=renewal_date)
+
+# Legacy route alias
+app.add_url_rule("/minha-conta", endpoint="minha_conta", view_func=my_account, methods=["GET", "POST"])
 
 
-# ── Export CSV ────────────────────────────────────────────────────────────────
+# ── CSV Export ───────────────────────────────────────────────────────────────
 
 @app.route("/export-csv")
 @login_required
 def export_csv():
-    if current_user.plano not in ("profissional", "agencia"):
-        flash("O download de CSV está disponível a partir do plano Profissional.", "info")
+    if current_user.plan not in ("profissional", "agencia"):
+        flash("CSV export is available on Professional and Agency plans.", "info")
         return redirect(url_for("dashboard"))
 
     valor_min = request.args.get("valor_min", type=float)
     uf = request.args.get("uf", "").strip().upper() or None
 
-    conn = conectar()
+    conn = get_connection()
     cur = conn.cursor()
-    try:
-        cur.execute("""
-            SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link, l.uf
-            FROM licitacoes l
-            JOIN alertas_enviados ae ON ae.licitacao_id = l.id
-            WHERE ae.cliente_id = %s
-              AND (%s IS NULL OR l.valor >= %s)
-              AND (%s IS NULL OR l.uf = %s)
-            ORDER BY ae.enviado_em DESC
-            LIMIT 500
-        """, [current_user.id, valor_min, valor_min, uf, uf])
-    except Exception:
-        cur.execute("""
-            SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link
-            FROM licitacoes l
-            JOIN alertas_enviados ae ON ae.licitacao_id = l.id
-            WHERE ae.cliente_id = %s
-              AND (%s IS NULL OR l.valor >= %s)
-            ORDER BY ae.enviado_em DESC
-            LIMIT 500
-        """, [current_user.id, valor_min, valor_min])
+    cur.execute(f"""
+        SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link, l.uf
+        FROM licitacoes l
+        JOIN alertas_enviados ae ON ae.licitacao_id = l.id
+        WHERE ae.cliente_id = %s
+          AND (%s IS NULL OR l.valor >= %s)
+          AND (%s IS NULL OR l.uf = %s)
+        ORDER BY ae.enviado_em DESC
+        LIMIT {CSV_EXPORT_LIMIT}
+    """, [current_user.id, valor_min, valor_min, uf, uf])
 
     rows = cur.fetchall()
     cur.close()
-    conn.close()
+    release_connection(conn)
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Órgão", "Objeto", "Valor (R$)", "Data publicação", "Link", "UF"])
+    writer.writerow(["Agency", "Title", "Value (USD)", "Posted Date", "Link", "State"])
     for row in rows:
-        orgao, objeto, valor, data, link = row[:5]
-        uf_val = row[5] if len(row) > 5 else ""
-        writer.writerow([orgao, objeto, formatar_moeda(valor), data, link, uf_val])
+        agency, title, value, posted, link, state = row
+        writer.writerow([agency, title, format_currency(value), posted, link, state or ""])
 
     return Response(
         output.getvalue(),
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment;filename=licitacoes.csv"},
+        headers={"Content-Disposition": "attachment;filename=contracts.csv"},
     )
 
 
-# ── Editar palavras-chave ─────────────────────────────────────────────────────
+# ── Edit Keywords ────────────────────────────────────────────────────────────
 
-@app.route("/editar-palavras", methods=["GET", "POST"])
+@app.route("/edit-keywords", methods=["GET", "POST"])
 @login_required
-def editar_palavras():
+def edit_keywords():
     if request.method == "POST":
-        palavras_lista = [p.strip() for p in request.form.get("palavras_chave", "").split(",") if p.strip()]
+        keywords_list = [p.strip() for p in request.form.get("palavras_chave", "").split(",") if p.strip()]
 
-        limite = current_user.limite_palavras
-        if limite is not None and len(palavras_lista) > limite:
-            flash(f"Your plan allows up to {limite} keywords. The first {limite} were saved.", "info")
-            palavras_lista = palavras_lista[:limite]
+        limit = current_user.keyword_limit
+        if limit is not None and len(keywords_list) > limit:
+            flash(f"Your plan allows up to {limit} keywords. The first {limit} were saved.", "info")
+            keywords_list = keywords_list[:limit]
 
-        conn = conectar()
+        conn = get_connection()
         cur = conn.cursor()
-        cur.execute("UPDATE clientes SET palavras_chave = %s WHERE id = %s", (palavras_lista, current_user.id))
+        cur.execute("UPDATE clientes SET palavras_chave = %s WHERE id = %s", (keywords_list, current_user.id))
         conn.commit()
         cur.close()
-        conn.close()
+        release_connection(conn)
         flash("Keywords updated successfully!", "sucesso")
         return redirect(url_for("dashboard"))
 
     return render_template("editar_palavras.html", cliente=current_user)
 
-
-# ── Editar perfil NAICS / set-asides ─────────────────────────────────────────
-
-VALID_SET_ASIDES = {"SBA", "8A", "HZC", "WOSB", "EDWOSB", "SDVOSB", "VSB"}
+# Legacy route alias
+app.add_url_rule("/editar-palavras", endpoint="editar_palavras", view_func=edit_keywords, methods=["GET", "POST"])
 
 
-@app.route("/editar-perfil", methods=["GET", "POST"])
+# ── Edit Profile (NAICS / Set-Asides) ────────────────────────────────────────
+
+@app.route("/edit-profile", methods=["GET", "POST"])
 @login_required
-def editar_perfil():
+def edit_profile():
     if request.method == "POST":
         naics_raw = request.form.get("naics_codes", "")
-        naics_lista = [c.strip() for c in naics_raw.replace(",", " ").split() if c.strip().isdigit()]
+        naics_list = [c.strip() for c in naics_raw.replace(",", " ").split() if c.strip().isdigit()]
 
-        set_asides_lista = [
+        set_asides_list = [
             s for s in request.form.getlist("set_asides")
             if s.upper() in VALID_SET_ASIDES
         ]
 
-        conn = conectar()
+        conn = get_connection()
         cur = conn.cursor()
         cur.execute(
             "UPDATE clientes SET naics_codes = %s, set_asides = %s WHERE id = %s",
-            (naics_lista or None, set_asides_lista or None, current_user.id),
+            (naics_list or None, set_asides_list or None, current_user.id),
         )
         conn.commit()
         cur.close()
-        conn.close()
+        release_connection(conn)
         flash("Profile updated successfully!", "sucesso")
         return redirect(url_for("dashboard"))
 
     return render_template("editar_perfil.html", cliente=current_user, valid_set_asides=sorted(VALID_SET_ASIDES))
 
+# Legacy route alias
+app.add_url_rule("/editar-perfil", endpoint="editar_perfil", view_func=edit_profile, methods=["GET", "POST"])
 
-# ── Assinatura / Stripe ───────────────────────────────────────────────────────
 
-@app.route("/assinar/<plano>")
+# ── Stripe Subscription ─────────────────────────────────────────────────────
+
+@app.route("/subscribe/<plan>")
 @login_required
-def assinar(plano):
-    if current_user.plano_pago:
+def subscribe(plan):
+    if current_user.has_paid_plan:
         flash("You already have an active subscription. To change plans, cancel the current one first.", "info")
         return redirect(url_for("dashboard"))
 
-    periodo = request.args.get("periodo", "mensal")
-    precos = {
+    period = request.args.get("periodo", "mensal")
+    prices = {
         "basico":               os.getenv("STRIPE_PRICE_BASICO"),
         "profissional":         os.getenv("STRIPE_PRICE_PROFISSIONAL"),
         "agencia":              os.getenv("STRIPE_PRICE_AGENCIA"),
@@ -580,18 +668,18 @@ def assinar(plano):
         "profissional_anual":   os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL"),
         "agencia_anual":        os.getenv("STRIPE_PRICE_AGENCIA_ANUAL"),
     }
-    price_id = precos.get(f"{plano}_anual" if periodo == "anual" else plano)
+    price_id = prices.get(f"{plan}_anual" if period == "anual" else plan)
 
     if not price_id:
         flash("Invalid plan.", "erro")
         return redirect(url_for("index"))
 
-    conn = conectar()
+    conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT stripe_customer_id FROM clientes WHERE id = %s", (current_user.id,))
     row = cur.fetchone()
     cur.close()
-    conn.close()
+    release_connection(conn)
     customer_id = row[0] if row and row[0] else None
 
     checkout_session = stripe.checkout.Session.create(
@@ -601,22 +689,25 @@ def assinar(plano):
         customer=customer_id,
         customer_email=None if customer_id else current_user.email,
         metadata={"cliente_id": current_user.id},
-        subscription_data={"trial_period_days": 7},
-        success_url=request.host_url + "pagamento/sucesso",
-        cancel_url=request.host_url + "pagamento/cancelado",
+        subscription_data={"trial_period_days": TRIAL_PERIOD_DAYS},
+        success_url=request.host_url + "payment/success",
+        cancel_url=request.host_url + "payment/cancelled",
     )
     return redirect(checkout_session.url, code=303)
 
+# Legacy route alias
+app.add_url_rule("/assinar/<plano>", endpoint="assinar", view_func=subscribe)
 
-@app.route("/gerenciar-assinatura")
+
+@app.route("/manage-subscription")
 @login_required
-def gerenciar_assinatura():
-    conn = conectar()
+def manage_subscription():
+    conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT stripe_customer_id FROM clientes WHERE id = %s", (current_user.id,))
     row = cur.fetchone()
     cur.close()
-    conn.close()
+    release_connection(conn)
 
     if not row or not row[0]:
         flash("No subscription found.", "info")
@@ -628,8 +719,8 @@ def gerenciar_assinatura():
             return_url=request.host_url + "dashboard",
         )
         return redirect(portal.url, code=303)
-    except stripe.error.InvalidRequestError:
-        conn = conectar()
+    except (stripe.InvalidRequestError, stripe.error.InvalidRequestError):
+        conn = get_connection()
         cur = conn.cursor()
         cur.execute(
             "UPDATE clientes SET stripe_customer_id = NULL, stripe_subscription_id = NULL, plano = NULL WHERE id = %s",
@@ -637,23 +728,34 @@ def gerenciar_assinatura():
         )
         conn.commit()
         cur.close()
-        conn.close()
+        release_connection(conn)
         flash("Subscription not found. Your plan was reset — please subscribe again.", "info")
         return redirect(url_for("index"))
 
+# Legacy route alias
+app.add_url_rule("/gerenciar-assinatura", endpoint="gerenciar_assinatura", view_func=manage_subscription)
 
-@app.route("/pagamento/sucesso")
+
+@app.route("/payment/success")
 @login_required
-def pagamento_sucesso():
+def payment_success():
     return render_template("pagamento_sucesso.html")
 
+# Legacy alias
+app.add_url_rule("/pagamento/sucesso", endpoint="pagamento_sucesso", view_func=payment_success)
 
-@app.route("/pagamento/cancelado")
+
+@app.route("/payment/cancelled")
 @login_required
-def pagamento_cancelado():
-    flash("Pagamento cancelado. Nenhuma cobrança foi feita.", "info")
+def payment_cancelled():
+    flash("Payment cancelled. No charges were made.", "info")
     return redirect(url_for("index"))
 
+# Legacy alias
+app.add_url_rule("/pagamento/cancelado", endpoint="pagamento_cancelado", view_func=payment_cancelled)
+
+
+# ── Stripe Webhook ───────────────────────────────────────────────────────────
 
 @app.route("/webhook/stripe", methods=["POST"])
 def webhook_stripe():
@@ -669,148 +771,212 @@ def webhook_stripe():
     if event["type"] == "checkout.session.completed":
         sess = event["data"]["object"]
         session_id = sess["id"]
-        cliente_id = sess["metadata"].get("cliente_id")
-        if not cliente_id:
+        client_id = sess["metadata"].get("cliente_id")
+        if not client_id:
             return "", 200
 
         subscription_id = sess.get("subscription")
         customer_id = sess.get("customer")
 
-        conn = conectar()
+        conn = get_connection()
         cur = conn.cursor()
 
-        # Idempotência: ignora se já processou esta sessão
-        cur.execute("SELECT stripe_last_session_id FROM clientes WHERE id = %s", (cliente_id,))
+        # Idempotency check
+        cur.execute("SELECT stripe_last_session_id FROM clientes WHERE id = %s", (client_id,))
         row = cur.fetchone()
         if row and row[0] == session_id:
             cur.close()
-            conn.close()
+            release_connection(conn)
             return "", 200
 
-        # Valida que o customer bate com o registro
         cur.execute(
             "SELECT id FROM clientes WHERE id = %s AND (stripe_customer_id = %s OR stripe_customer_id IS NULL)",
-            (cliente_id, customer_id),
+            (client_id, customer_id),
         )
         if not cur.fetchone():
             cur.close()
-            conn.close()
+            release_connection(conn)
             return "", 200
 
-        plano = "basico"
+        plan = "basico"
         try:
             for item in stripe.checkout.Session.list_line_items(session_id).data:
                 pid = item.price.id
                 if pid in (os.getenv("STRIPE_PRICE_PROFISSIONAL"), os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL")):
-                    plano = "profissional"
+                    plan = "profissional"
                 elif pid in (os.getenv("STRIPE_PRICE_AGENCIA"), os.getenv("STRIPE_PRICE_AGENCIA_ANUAL")):
-                    plano = "agencia"
+                    plan = "agencia"
         except Exception:
             pass
 
         cur.execute(
             "UPDATE clientes SET plano=%s, stripe_customer_id=%s, stripe_subscription_id=%s, stripe_last_session_id=%s WHERE id=%s",
-            (plano, customer_id, subscription_id, session_id, cliente_id),
+            (plan, customer_id, subscription_id, session_id, client_id),
         )
 
-        # Adiciona à newsletter se ainda não estiver
-        cur.execute("SELECT id FROM newsletter WHERE email = (SELECT email FROM clientes WHERE id = %s)", (cliente_id,))
+        # Add to newsletter if not already
+        cur.execute("SELECT id FROM newsletter WHERE email = (SELECT email FROM clientes WHERE id = %s)", (client_id,))
         if not cur.fetchone():
             cur.execute("""
-                INSERT INTO newsletter (email, nome, token_descadastro)
-                SELECT email, nome, %s FROM clientes WHERE id = %s
+                INSERT INTO newsletter (email, nome, token_descadastro, confirmed)
+                SELECT email, nome, %s, TRUE FROM clientes WHERE id = %s
                 ON CONFLICT (email) DO NOTHING
-            """, (secrets.token_urlsafe(32), cliente_id))
+            """, (secrets.token_urlsafe(32), client_id))
 
         conn.commit()
         cur.close()
-        conn.close()
+        release_connection(conn)
 
     elif event["type"] == "customer.subscription.deleted":
         subscription_id = event["data"]["object"]["id"]
-        conn = conectar()
+        conn = get_connection()
         cur = conn.cursor()
+
+        # Idempotency check (Q9)
+        cur.execute("SELECT id FROM clientes WHERE stripe_subscription_id = %s AND plano IS NOT NULL", (subscription_id,))
+        if not cur.fetchone():
+            cur.close()
+            release_connection(conn)
+            return "", 200
+
         cur.execute(
             "UPDATE clientes SET plano=NULL, stripe_customer_id=NULL, stripe_subscription_id=NULL WHERE stripe_subscription_id=%s",
             (subscription_id,),
         )
         conn.commit()
         cur.close()
-        conn.close()
+        release_connection(conn)
 
     return "", 200
 
 
-# ── Newsletter ────────────────────────────────────────────────────────────────
+# ── Newsletter ───────────────────────────────────────────────────────────────
 
-@app.route("/newsletter/cadastro", methods=["POST"])
-def newsletter_cadastro():
-    nome = request.form.get("nome", "").strip()
+@app.route("/newsletter/signup", methods=["POST"])
+@limiter.limit("5/minute")
+def newsletter_signup():
+    name = request.form.get("nome", "").strip()
     email = request.form.get("email", "").strip().lower()
 
-    if not email:
-        flash("E-mail inválido.", "erro")
+    if not email or not _is_valid_email(email):
+        flash("Please enter a valid email address.", "erro")
         return redirect(url_for("index") + "#newsletter")
 
     token = secrets.token_urlsafe(32)
-    conn = conectar()
+    conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, ativo FROM newsletter WHERE email = %s", (email,))
-    existente = cur.fetchone()
+    cur.execute("SELECT id, ativo, confirmed FROM newsletter WHERE email = %s", (email,))
+    existing = cur.fetchone()
 
-    if existente:
-        if existente[1]:
-            flash("Este e-mail já está cadastrado na newsletter.", "info")
+    if existing:
+        if existing[1] and existing[2]:
+            flash("This email is already subscribed to the newsletter.", "info")
+        elif existing[1] and not existing[2]:
+            flash("Check your email to confirm your subscription.", "info")
         else:
-            cur.execute("UPDATE newsletter SET ativo = TRUE WHERE email = %s", (email,))
+            cur.execute("UPDATE newsletter SET ativo = TRUE, confirmed = FALSE, token_descadastro = %s WHERE email = %s", (token, email))
             conn.commit()
-            flash("Bem-vindo de volta! Você voltou a receber a newsletter.", "sucesso")
+            # Send confirmation email
+            send_email(email, "Confirm your TenderSentinel newsletter subscription", f"""
+            <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
+                <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
+                <p>Hi, <strong>{html_lib.escape(name)}</strong>!</p>
+                <p>Click below to confirm your newsletter subscription:</p>
+                <p><a href="{BASE_URL}/newsletter/confirm/{token}"
+                   style="display:inline-block;background:#0f1f3d;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px">
+                   Confirm subscription
+                </a></p>
+            </div>
+            """)
+            flash("Welcome back! Check your email to confirm.", "sucesso")
         cur.close()
-        conn.close()
+        release_connection(conn)
         return redirect(url_for("index") + "#newsletter")
 
     cur.execute(
-        "INSERT INTO newsletter (email, nome, token_descadastro) VALUES (%s, %s, %s)",
-        (email, nome, token),
+        "INSERT INTO newsletter (email, nome, token_descadastro, confirmed) VALUES (%s, %s, %s, FALSE)",
+        (email, name, token),
     )
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
 
-    enviar_email(email, "Você está no Radar Semanal do TenderSentinel!", f"""
+    # Double opt-in confirmation email (Q7)
+    send_email(email, "Confirm your TenderSentinel newsletter subscription", f"""
     <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
         <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
-        <p>Olá, <strong>{html_lib.escape(nome)}</strong>!</p>
-        <p>Você está no <strong>Radar Semanal</strong>. Toda segunda às 9h você recebe as melhores oportunidades da semana.</p>
+        <p>Hi, <strong>{html_lib.escape(name)}</strong>!</p>
+        <p>Click below to confirm your newsletter subscription:</p>
+        <p><a href="{BASE_URL}/newsletter/confirm/{token}"
+           style="display:inline-block;background:#0f1f3d;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px">
+           Confirm subscription
+        </a></p>
         <p style="color:#64748b;font-size:0.85rem;margin-top:1.5rem">
-            Não quer mais receber?
-            <a href="{request.host_url}newsletter/descadastro/{token}" style="color:#c9a84c">Clique aqui para se descadastrar.</a>
+            If you didn't request this, just ignore this email.
         </p>
     </div>
     """)
-    flash("Cadastrado! Você receberá a newsletter toda segunda.", "sucesso")
+    flash("Check your email to confirm your subscription!", "sucesso")
     return redirect(url_for("index") + "#newsletter")
 
+# Legacy route alias
+app.add_url_rule("/newsletter/cadastro", endpoint="newsletter_cadastro", view_func=newsletter_signup, methods=["POST"])
 
-@app.route("/newsletter/descadastro/<token>")
-def newsletter_descadastro(token):
-    conn = conectar()
+
+@app.route("/newsletter/confirm/<token>")
+def newsletter_confirm(token):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE newsletter SET confirmed = TRUE WHERE token_descadastro = %s AND ativo = TRUE", (token,))
+    updated = cur.rowcount
+    conn.commit()
+    cur.close()
+    release_connection(conn)
+
+    if updated:
+        flash("Subscription confirmed! You'll receive our weekly digest every Monday.", "sucesso")
+    else:
+        flash("Invalid or expired confirmation link.", "erro")
+    return redirect(url_for("index"))
+
+
+@app.route("/newsletter/unsubscribe/<token>")
+def newsletter_unsubscribe(token):
+    conn = get_connection()
     cur = conn.cursor()
     cur.execute("UPDATE newsletter SET ativo = FALSE WHERE token_descadastro = %s", (token,))
     conn.commit()
     cur.close()
-    conn.close()
-    flash("Você foi removido da newsletter.", "info")
+    release_connection(conn)
+    flash("You've been unsubscribed from the newsletter.", "info")
     return redirect(url_for("index"))
 
+# Legacy route alias
+app.add_url_rule("/newsletter/descadastro/<token>", endpoint="newsletter_descadastro", view_func=newsletter_unsubscribe)
 
-# ── Blog ──────────────────────────────────────────────────────────────────────
+
+# ── Planos page ──────────────────────────────────────────────────────────────
+
+@app.route("/planos")
+def planos():
+    return render_template("planos.html")
+
+
+# ── Blog ─────────────────────────────────────────────────────────────────────
 
 BLOG_DIR = Path(__file__).parent.parent / "content" / "blog"
 
+_blog_cache = {"posts": None, "loaded_at": 0}
+_BLOG_CACHE_TTL = 300  # 5 minutes
+
 
 def _load_posts(limit=None):
-    """Load and sort all blog posts from content/blog/*.md"""
+    """Load and sort all blog posts from content/blog/*.md with caching."""
+    now = time.time()
+    if _blog_cache["posts"] is not None and (now - _blog_cache["loaded_at"]) < _BLOG_CACHE_TTL:
+        posts = _blog_cache["posts"]
+        return posts[:limit] if limit else posts
+
     posts = []
     if not BLOG_DIR.exists():
         return posts
@@ -830,6 +996,8 @@ def _load_posts(limit=None):
         except Exception:
             continue
     posts.sort(key=lambda p: p["date"] or date.min, reverse=True)
+    _blog_cache["posts"] = posts
+    _blog_cache["loaded_at"] = now
     return posts[:limit] if limit else posts
 
 
@@ -863,8 +1031,18 @@ def blog_post(slug):
         extensions=["extra", "toc", "nl2br"],
     )
     all_posts = _load_posts()
-    related = [p for p in all_posts if p["slug"] != slug][:3]
-    base_url = os.getenv("BASE_URL", "https://tendersentinel.com")
+
+    # Related articles by tag match (Q47)
+    current_tags = set(post.get("tags", []))
+    other_posts = [p for p in all_posts if p["slug"] != slug]
+    if current_tags:
+        other_posts.sort(
+            key=lambda p: len(current_tags & set(p.get("tags", []))),
+            reverse=True,
+        )
+    related = other_posts[:3]
+
+    base_url = BASE_URL
     return render_template(
         "blog/post.html",
         post=post,
@@ -875,24 +1053,38 @@ def blog_post(slug):
     )
 
 
+# ── SEO ──────────────────────────────────────────────────────────────────────
+
 @app.route("/sitemap.xml")
 def sitemap():
-    base_url = os.getenv("BASE_URL", "https://tendersentinel.com")
+    base_url = BASE_URL
+    today = date.today().isoformat()
     posts = _load_posts()
-    static_urls = [
-        {"loc": base_url + "/", "priority": "1.0"},
-        {"loc": base_url + "/blog", "priority": "0.8"},
-        {"loc": base_url + "/planos", "priority": "0.7"},
-        {"loc": base_url + "/cadastro", "priority": "0.6"},
+    urls = [
+        {"loc": base_url + "/", "lastmod": today, "priority": "1.0"},
+        {"loc": base_url + "/blog", "lastmod": today, "priority": "0.8"},
+        {"loc": base_url + "/planos", "lastmod": today, "priority": "0.7"},
+        {"loc": base_url + "/signup", "lastmod": today, "priority": "0.6"},
     ]
     for p in posts:
-        static_urls.append({
+        urls.append({
             "loc": f"{base_url}/blog/{p['slug']}",
-            "lastmod": str(p["date"]) if p["date"] else "",
+            "lastmod": str(p["date"]) if p["date"] else today,
             "priority": "0.9",
         })
-    xml = render_template("sitemap.xml", urls=static_urls)
+    xml = render_template("sitemap.xml", urls=urls)
     return Response(xml, mimetype="application/xml")
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    base_url = BASE_URL
+    content = f"""User-agent: *
+Allow: /
+
+Sitemap: {base_url}/sitemap.xml
+"""
+    return Response(content, mimetype="text/plain")
 
 
 if __name__ == "__main__":

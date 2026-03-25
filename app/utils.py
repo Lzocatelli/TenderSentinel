@@ -1,22 +1,23 @@
-PLANO_LIMITES = {
-    "basico": 5,
-    "profissional": 20,
-    "agencia": None,  # unlimited
-}
+from app.config import PLAN_LIMITS, FREE_KEYWORD_LIMIT
 
 
-def limite_palavras(plano):
+def keyword_limit(plan):
     """Returns the max keywords allowed. None = unlimited."""
-    if not plano:
-        return 1
-    return PLANO_LIMITES.get(plano, 1)
+    if not plan:
+        return FREE_KEYWORD_LIMIT
+    return PLAN_LIMITS.get(plan, FREE_KEYWORD_LIMIT)
 
 
-def formatar_moeda(valor):
+def format_currency(value):
     """Formats a numeric value as USD (e.g. $1,234.56)."""
-    if valor is None:
+    if value is None:
         return "N/A"
     try:
-        return f"${float(valor):,.2f}"
+        return f"${float(value):,.2f}"
     except Exception:
         return "N/A"
+
+
+# Legacy aliases for backwards compat during migration
+limite_palavras = keyword_limit
+formatar_moeda = format_currency

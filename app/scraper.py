@@ -1,76 +1,81 @@
-import requests
+import logging
 import os
 import time
 from datetime import date, timedelta
+
+import requests
 from dotenv import load_dotenv
-from app.database import conectar
+
+from app.database import get_connection, release_connection
 
 load_dotenv()
+
+logger = logging.getLogger("tendersentinel.scraper")
 
 SAM_API_URL = "https://api.sam.gov/opportunities/v2/search"
 
 
-def buscar_licitacoes(data_inicio=None, data_fim=None):
-    if not data_inicio:
-        data_inicio = (date.today() - timedelta(days=1)).strftime("%m/%d/%Y")
-    if not data_fim:
-        data_fim = date.today().strftime("%m/%d/%Y")
+def fetch_opportunities(date_from=None, date_to=None):
+    """Fetch opportunities from SAM.gov public API."""
+    if not date_from:
+        date_from = (date.today() - timedelta(days=1)).strftime("%m/%d/%Y")
+    if not date_to:
+        date_to = date.today().strftime("%m/%d/%Y")
 
     api_key = os.getenv("SAM_API_KEY")
-    todas = []
-    offset = 0
-    limit = 1000
+    if not api_key:
+        logger.error("SAM_API_KEY not set")
+        return []
 
     params = {
         "api_key": api_key,
-        "postedFrom": data_inicio,
-        "postedTo": data_fim,
-        "limit": limit,
-        "offset": offset,
+        "postedFrom": date_from,
+        "postedTo": date_to,
+        "limit": 1000,
+        "offset": 0,
     }
 
-    for tentativa in range(3):
+    for attempt in range(3):
         try:
             response = requests.get(SAM_API_URL, params=params, timeout=30)
 
             if response.status_code == 200:
                 data = response.json()
-                todas = data.get("opportunitiesData", [])
-                return todas
+                results = data.get("opportunitiesData", [])
+                logger.info(f"Fetched {len(results)} opportunities from SAM.gov")
+                return results
             else:
-                print(f"SAM.gov error: {response.status_code}")
-                return todas
+                logger.error(f"SAM.gov returned status {response.status_code}")
+                return []
 
         except requests.exceptions.Timeout:
-            print(f"SAM.gov timeout (attempt {tentativa + 1}/3)...")
-            if tentativa < 2:
+            logger.warning(f"SAM.gov timeout (attempt {attempt + 1}/3)")
+            if attempt < 2:
                 time.sleep(3)
             else:
-                print("SAM.gov did not respond after 3 attempts.")
+                logger.error("SAM.gov did not respond after 3 attempts")
 
-    return todas
+    return []
 
 
-def salvar_licitacoes(licitacoes):
-    if not licitacoes:
-        print("No opportunities found.")
+def save_opportunities(opportunities):
+    """Save opportunities to the database. Returns count of new records."""
+    if not opportunities:
+        logger.info("No opportunities to save")
         return 0
 
-    conn = conectar()
+    conn = get_connection()
     cur = conn.cursor()
-    salvas = 0
+    saved = 0
 
-    for item in licitacoes:
+    for item in opportunities:
         try:
-            # Parse state from place of performance
             pop = item.get("placeOfPerformance") or {}
             state = (pop.get("state") or {}).get("code")
 
-            # Parse deadline date
             deadline_raw = item.get("responseDeadLine")
             deadline = deadline_raw[:10] if deadline_raw else None
 
-            # Parse posted date
             posted_raw = item.get("postedDate")
             posted = posted_raw[:10] if posted_raw else None
 
@@ -91,31 +96,39 @@ def salvar_licitacoes(licitacoes):
                 deadline,
             ))
             if cur.rowcount > 0:
-                salvas += 1
+                saved += 1
         except Exception as e:
-            print(f"Error saving opportunity: {e}")
+            logger.error(f"Error saving opportunity: {e}")
             conn.rollback()
             continue
 
     conn.commit()
     cur.close()
-    conn.close()
-    return salvas
+    release_connection(conn)
+    logger.info(f"{saved} new opportunities saved")
+    return saved
 
 
-def filtrar_por_palavra_chave(palavras_chave):
-    conn = conectar()
+def filter_by_keywords(keywords):
+    """Filter opportunities by keyword match."""
+    conn = get_connection()
     cur = conn.cursor()
-    resultados = []
+    results = []
 
-    for palavra in palavras_chave:
+    for keyword in keywords:
         cur.execute("""
             SELECT sam_id, orgao, objeto, deadline, data_publicacao, link, naics_code, set_aside
             FROM licitacoes
             WHERE LOWER(objeto) LIKE %s
-        """, (f"%{palavra.lower()}%",))
-        resultados.extend(cur.fetchall())
+        """, (f"%{keyword.lower()}%",))
+        results.extend(cur.fetchall())
 
     cur.close()
-    conn.close()
-    return resultados
+    release_connection(conn)
+    return results
+
+
+# Legacy aliases for backwards compat
+buscar_licitacoes = fetch_opportunities
+salvar_licitacoes = save_opportunities
+filtrar_por_palavra_chave = filter_by_keywords

@@ -1,36 +1,40 @@
-from app.scraper import buscar_licitacoes, salvar_licitacoes
-from app.alertas import disparar_alertas, enviar_email
+import logging
 import os
 import traceback
+
 from dotenv import load_dotenv
+
+from app.scraper import fetch_opportunities, save_opportunities
+from app.alertas import dispatch_alerts, send_email
 
 load_dotenv(override=False)
 
+logger = logging.getLogger("tendersentinel.main")
 
 if __name__ == "__main__":
-    print("=== TenderSentinel — execução única (produção) ===")
+    logger.info("=== TenderSentinel — single execution (production) ===")
 
     try:
-        print("\n1. Buscando licitações no portal...")
-        licitacoes = buscar_licitacoes()
-        total = salvar_licitacoes(licitacoes)
-        print(f"{total} licitações novas salvas no banco.")
+        logger.info("1. Fetching opportunities from SAM.gov...")
+        opportunities = fetch_opportunities()
+        saved = save_opportunities(opportunities)
+        logger.info(f"{saved} new opportunities saved to database")
 
-        print("\n2. Disparando alertas para os clientes ativos...")
-        disparar_alertas()
+        logger.info("2. Dispatching alerts to active clients...")
+        dispatch_alerts()
 
-        print("\nExecução concluída com sucesso.")
+        logger.info("Execution completed successfully")
 
     except Exception as e:
-        msg = f"Erro no job TenderSentinel:\n\n{traceback.format_exc()}"
-        print(msg)
+        msg = f"TenderSentinel job error:\n\n{traceback.format_exc()}"
+        logger.error(msg)
 
         admin_email = os.getenv("ADMIN_EMAIL")
         if admin_email:
             try:
-                enviar_email(
+                send_email(
                     admin_email,
-                    "TenderSentinel — Falha no job diário",
+                    "TenderSentinel — Daily job failure",
                     f"<pre>{msg}</pre>",
                 )
             except Exception:

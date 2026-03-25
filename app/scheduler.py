@@ -1,55 +1,74 @@
-from app.scraper import buscar_licitacoes, salvar_licitacoes
-from app.alertas import disparar_alertas
-from app.relatorio import gerar_relatorio_semanal
+import logging
+import os
+import traceback
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from pytz import timezone
 
+from app.scraper import fetch_opportunities, save_opportunities
+from app.alertas import dispatch_alerts, send_email
+from app.relatorio import generate_weekly_report
 
-def buscar_e_alertar():
-    print("Iniciando busca de licitações...")
-    licitacoes = buscar_licitacoes()
-
-    total = salvar_licitacoes(licitacoes)
-    print(f"{total} licitações novas salvas.")
-
-    print("Disparando alertas...")
-    disparar_alertas()
-
-    print("Ciclo concluído!")
+logger = logging.getLogger("tendersentinel.scheduler")
 
 
-def iniciar_scheduler():
+def fetch_and_alert():
+    """Daily job: fetch opportunities from SAM.gov and send alerts."""
+    try:
+        logger.info("Starting daily opportunity fetch...")
+        opportunities = fetch_opportunities()
+        saved = save_opportunities(opportunities)
+        logger.info(f"{saved} new opportunities saved")
+
+        logger.info("Dispatching alerts...")
+        dispatch_alerts()
+        logger.info("Daily cycle completed")
+    except Exception as e:
+        error_msg = f"Scheduler job failed:\n\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        admin_email = os.getenv("ADMIN_EMAIL")
+        if admin_email:
+            try:
+                send_email(admin_email, "TenderSentinel — Daily job failure", f"<pre>{error_msg}</pre>")
+            except Exception:
+                pass
+
+
+def start_scheduler():
     """
-    Agenda:
-    - Todos os dias às 9h00 (America/Sao_Paulo): buscar_e_alertar
-    - Toda segunda-feira às 9h30 (America/Sao_Paulo): gerar_relatorio_semanal
+    Schedule:
+    - Daily at 9:00 AM ET: fetch_and_alert
+    - Every Monday at 9:30 AM ET: generate_weekly_report
     """
-    tz = timezone("America/Sao_Paulo")
+    tz = timezone("America/New_York")
     scheduler = BlockingScheduler(timezone=tz)
 
     scheduler.add_job(
-        buscar_e_alertar,
+        fetch_and_alert,
         "cron",
         hour=9,
         minute=0,
-        id="buscar_e_alertar_diario",
+        id="daily_fetch_and_alert",
         replace_existing=True,
     )
 
     scheduler.add_job(
-        gerar_relatorio_semanal,
+        generate_weekly_report,
         "cron",
         day_of_week="mon",
         hour=9,
         minute=30,
-        id="relatorio_semanal_profissional_agencia",
+        id="weekly_report",
         replace_existing=True,
     )
 
-    print("Scheduler iniciado. Aguardando jobs...")
+    logger.info("Scheduler started. Waiting for jobs...")
     scheduler.start()
 
 
+# Legacy aliases
+buscar_e_alertar = fetch_and_alert
+iniciar_scheduler = start_scheduler
+
 if __name__ == "__main__":
-    iniciar_scheduler()
+    start_scheduler()

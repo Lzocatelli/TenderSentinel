@@ -1,50 +1,60 @@
-from app.scraper import buscar_licitacoes, salvar_licitacoes
-from app.alertas import disparar_alertas
-from app.database import conectar
+"""
+Integration test for TenderSentinel pipeline.
+Tests: SAM.gov fetch → save → alert dispatch.
+"""
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from app.scraper import fetch_opportunities, save_opportunities
+from app.alertas import dispatch_alerts
+from app.database import get_connection, release_connection
+
+TEST_EMAIL = os.getenv("TEST_EMAIL", "test@example.com")
 
 
 if __name__ == "__main__":
-    print("=== INICIANDO TESTE COMPLETO (LOCAL) ===")
+    print("=== TenderSentinel — Full Flow Test ===")
 
-    print("\n1. Buscando licitações no portal...")
-    licitacoes = buscar_licitacoes()
-    total = salvar_licitacoes(licitacoes)
-    print(f"{total} licitações novas salvas no banco.")
+    print("\n1. Fetching opportunities from SAM.gov...")
+    opportunities = fetch_opportunities()
+    saved = save_opportunities(opportunities)
+    print(f"{saved} new opportunities saved to database.")
 
-    print("\n2. Preparando banco de dados para o teste...")
-    conn = conectar()
+    print("\n2. Setting up test client...")
+    conn = get_connection()
     cur = conn.cursor()
 
-    palavras_teste = [
+    test_keywords = [
         "software",
-        "desenvolvimento de software",
-        "manutenção de software",
-        "licença de software",
-        "sistema de gestão",
-        "aplicação web",
-        "aplicativo",
-        "serviços de TI",
+        "IT services",
+        "cybersecurity",
+        "cloud computing",
+        "data analytics",
     ]
-    meu_email = "luizzocatelli2014@gmail.com"  # O e-mail que vai receber o alerta
 
     cur.execute(
         """
-        INSERT INTO clientes (nome, email, palavras_chave, ativo) 
-        VALUES ('Teste Local', %s, %s, TRUE)
-        ON CONFLICT (email) DO UPDATE 
+        INSERT INTO clientes (nome, email, palavras_chave, ativo)
+        VALUES ('Test User', %s, %s, TRUE)
+        ON CONFLICT (email) DO UPDATE
         SET palavras_chave = %s;
-    """,
-        (meu_email, palavras_teste, palavras_teste),
+        """,
+        (TEST_EMAIL, test_keywords, test_keywords),
     )
 
-    # Limpa os registros anteriores de alertas para o teste
-    cur.execute("DELETE FROM alertas_enviados;")
+    # Only clear alerts for the test user, not all users (Q31)
+    cur.execute(
+        "DELETE FROM alertas_enviados WHERE cliente_id = (SELECT id FROM clientes WHERE email = %s)",
+        (TEST_EMAIL,),
+    )
     conn.commit()
     cur.close()
-    conn.close()
+    release_connection(conn)
 
-    print("\n3. Disparando alertas para o cliente de teste...")
-    disparar_alertas()
+    print("\n3. Dispatching alerts for test client...")
+    dispatch_alerts()
 
-    print("\nTeste completo finalizado!")
-
+    print("\nFull flow test completed!")
