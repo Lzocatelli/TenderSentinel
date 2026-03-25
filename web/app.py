@@ -6,7 +6,11 @@ import os
 import secrets
 import time
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from threading import Thread
+
+import frontmatter
+import markdown as md_lib
 
 import requests
 import stripe
@@ -51,6 +55,11 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
+
+
+@app.context_processor
+def inject_globals():
+    return {"now": datetime.utcnow()}
 
 
 class Cliente(UserMixin):
@@ -793,6 +802,97 @@ def newsletter_descadastro(token):
     conn.close()
     flash("Você foi removido da newsletter.", "info")
     return redirect(url_for("index"))
+
+
+# ── Blog ──────────────────────────────────────────────────────────────────────
+
+BLOG_DIR = Path(__file__).parent.parent / "content" / "blog"
+
+
+def _load_posts(limit=None):
+    """Load and sort all blog posts from content/blog/*.md"""
+    posts = []
+    if not BLOG_DIR.exists():
+        return posts
+    for path in BLOG_DIR.glob("*.md"):
+        try:
+            post = frontmatter.load(str(path))
+            slug = path.stem
+            posts.append({
+                "slug": slug,
+                "title": post.get("title", slug),
+                "description": post.get("description", ""),
+                "date": post.get("date"),
+                "tags": post.get("tags", []),
+                "thumbnail": post.get("thumbnail", ""),
+                "author": post.get("author", "TenderSentinel"),
+            })
+        except Exception:
+            continue
+    posts.sort(key=lambda p: p["date"] or date.min, reverse=True)
+    return posts[:limit] if limit else posts
+
+
+@app.route("/api/blog/preview")
+def blog_preview_api():
+    posts = _load_posts(limit=3)
+    return jsonify([{
+        "slug": p["slug"],
+        "title": p["title"],
+        "description": p["description"],
+        "date": str(p["date"]) if p["date"] else "",
+        "tags": p["tags"],
+        "thumbnail": p["thumbnail"],
+    } for p in posts])
+
+
+@app.route("/blog")
+def blog_index():
+    posts = _load_posts()
+    return render_template("blog/index.html", posts=posts)
+
+
+@app.route("/blog/<slug>")
+def blog_post(slug):
+    path = BLOG_DIR / f"{slug}.md"
+    if not path.exists():
+        abort(404)
+    post = frontmatter.load(str(path))
+    content_html = md_lib.markdown(
+        post.content,
+        extensions=["extra", "toc", "nl2br"],
+    )
+    all_posts = _load_posts()
+    related = [p for p in all_posts if p["slug"] != slug][:3]
+    base_url = os.getenv("BASE_URL", "https://tendersentinel.com")
+    return render_template(
+        "blog/post.html",
+        post=post,
+        slug=slug,
+        content_html=content_html,
+        related=related,
+        base_url=base_url,
+    )
+
+
+@app.route("/sitemap.xml")
+def sitemap():
+    base_url = os.getenv("BASE_URL", "https://tendersentinel.com")
+    posts = _load_posts()
+    static_urls = [
+        {"loc": base_url + "/", "priority": "1.0"},
+        {"loc": base_url + "/blog", "priority": "0.8"},
+        {"loc": base_url + "/planos", "priority": "0.7"},
+        {"loc": base_url + "/cadastro", "priority": "0.6"},
+    ]
+    for p in posts:
+        static_urls.append({
+            "loc": f"{base_url}/blog/{p['slug']}",
+            "lastmod": str(p["date"]) if p["date"] else "",
+            "priority": "0.9",
+        })
+    xml = render_template("sitemap.xml", urls=static_urls)
+    return Response(xml, mimetype="application/xml")
 
 
 if __name__ == "__main__":

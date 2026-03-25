@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>{% block title %}GovCon Insights | TenderSentinel{% endblock %}</title>
+
+<!-- SEO & OG -->
+{% block meta %}
+<meta name="description" content="Federal contracting intelligence for small businesses. Tips, guides, and analysis on winning government contracts."/>
+<meta property="og:site_name" content="TenderSentinel"/>
+<meta property="og:type" content="website"/>
+<meta name="twitter:card" content="summary_large_image"/>
+{% endblock %}
+
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&family=Work+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "surface-container-highest": "#d3e4fe",
+                    "surface-dim": "#cbdbf5",
+                    "on-background": "#0b1c30",
+                    "on-surface": "#0b1c30",
+                    "inverse-on-surface": "#eaf1ff",
+                    "on-secondary": "#ffffff",
+                    "secondary": "#9f4200",
+                    "secondary-container": "#fc7218",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-high": "#dce9ff",
+                    "outline-variant": "#c6c6cd",
+                    "surface": "#f8f9ff",
+                    "surface-container-low": "#eff4ff",
+                    "primary-container": "#131b2e",
+                    "on-primary-container": "#7c839b",
+                    "background": "#f8f9ff",
+                    "primary-fixed": "#dae2fd",
+                    "secondary-fixed": "#ffdbcb",
+                    "secondary-fixed-dim": "#ffb692",
+                    "surface-variant": "#d3e4fe",
+                    "primary": "#000000",
+                    "on-surface-variant": "#45464d",
+                    "surface-container": "#e5eeff",
+                    "on-primary": "#ffffff",
+                    "outline": "#76777d",
+                },
+                fontFamily: {
+                    "headline": ["Inter"],
+                    "body": ["Work Sans"],
+                    "label": ["Space Grotesk"]
+                },
+                borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                typography: (theme) => ({
+                    DEFAULT: {
+                        css: {
+                            color: theme("colors.on-surface"),
+                            fontFamily: theme("fontFamily.body").join(","),
+                            fontSize: "1.0625rem",
+                            lineHeight: "1.8",
+                            maxWidth: "none",
+                            a: { color: theme("colors.secondary"), textDecoration: "none", "&:hover": { textDecoration: "underline" } },
+                            h1: { fontFamily: theme("fontFamily.headline").join(","), fontWeight: "900", color: theme("colors.on-surface") },
+                            h2: { fontFamily: theme("fontFamily.headline").join(","), fontWeight: "800", color: theme("colors.on-surface"), marginTop: "2rem" },
+                            h3: { fontFamily: theme("fontFamily.headline").join(","), fontWeight: "700", color: theme("colors.on-surface") },
+                            blockquote: { borderLeftColor: theme("colors.secondary"), backgroundColor: theme("colors.surface-container-low"), padding: "1rem 1.5rem", borderRadius: "0.25rem", fontStyle: "normal", color: theme("colors.on-surface") },
+                            code: { backgroundColor: theme("colors.surface-container-high"), padding: "0.15rem 0.4rem", borderRadius: "0.2rem", fontWeight: "500" },
+                            "code::before": { content: '""' },
+                            "code::after": { content: '""' },
+                            pre: { backgroundColor: theme("colors.primary-container"), color: "#e2e8f0" },
+                        },
+                    },
+                }),
+            },
+        },
+    }
+</script>
+<style>
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; }
+</style>
+{% block head %}{% endblock %}
+</head>
+<body class="bg-surface text-on-surface font-body antialiased">
+
+<!-- Nav -->
+<nav class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-outline-variant/20">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <a href="/" class="font-headline font-black text-xl tracking-tight">Tender<span class="text-secondary">Sentinel</span></a>
+        <div class="hidden md:flex items-center gap-8">
+            <a href="/blog" class="font-label text-sm font-semibold text-secondary uppercase tracking-widest">Blog</a>
+            <a href="/#planos" class="font-label text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors">Pricing</a>
+            <a href="/login" class="font-label text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors">Sign in</a>
+            <a href="/cadastro" class="px-4 py-2 bg-primary text-white font-headline font-bold text-sm rounded hover:opacity-90 transition-opacity">Start Free Trial</a>
+        </div>
+        <a href="/cadastro" class="md:hidden px-4 py-2 bg-primary text-white font-headline font-bold text-sm rounded">Start Free</a>
+    </div>
+</nav>
+
+<main class="pt-16">
+    {% block content %}{% endblock %}
+</main>
+
+<!-- Footer -->
+<footer class="bg-slate-950 text-white py-12 px-6 border-t border-slate-800 mt-24">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+        <div>
+            <div class="font-headline font-black text-lg mb-1">Tender<span class="text-secondary-container">Sentinel</span></div>
+            <div class="font-label text-xs text-slate-400">Smart Federal Contract Monitor</div>
+        </div>
+        <div class="flex gap-8 font-label text-sm text-slate-400">
+            <a href="/blog" class="hover:text-white transition-colors">Blog</a>
+            <a href="/#planos" class="hover:text-white transition-colors">Pricing</a>
+            <a href="/cadastro" class="hover:text-white transition-colors">Sign Up</a>
+            <a href="/login" class="hover:text-white transition-colors">Sign In</a>
+        </div>
+        <div class="font-label text-xs text-slate-500">&copy; {{ now.year }} TenderSentinel. All rights reserved.</div>
+    </div>
+</footer>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

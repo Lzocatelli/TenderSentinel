@@ -1,0 +1,74 @@
+{% extends "blog/base.html" %}
+
+{% block title %}GovCon Insights | TenderSentinel{% endblock %}
+
+{% block meta %}
+<meta name="description" content="Federal contracting intelligence for small businesses. Guides, tips, and analysis on winning government contracts through SAM.gov."/>
+<meta property="og:title" content="GovCon Insights | TenderSentinel"/>
+<meta property="og:description" content="Federal contracting intelligence for small businesses."/>
+<meta property="og:type" content="website"/>
+<meta name="twitter:card" content="summary"/>
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<section class="py-20 bg-primary text-white">
+    <div class="max-w-4xl mx-auto px-6">
+        <div class="font-label text-xs uppercase tracking-widest text-on-primary-container mb-4">TenderSentinel</div>
+        <h1 class="font-headline text-5xl md:text-6xl font-black tracking-tight mb-4">GovCon Insights.</h1>
+        <p class="text-on-primary-container text-xl max-w-2xl">Federal contracting intelligence for small businesses. Guides, tips, and analysis on winning government contracts.</p>
+    </div>
+</section>
+
+<!-- Posts grid -->
+<section class="py-16">
+    <div class="max-w-7xl mx-auto px-6">
+        {% if posts %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {% for post in posts %}
+            <a href="/blog/{{ post.slug }}" class="group bg-white rounded-xl border border-outline-variant/20 overflow-hidden hover:shadow-lg hover:border-outline-variant/50 transition-all flex flex-col">
+                {% if post.thumbnail %}
+                <div class="aspect-video overflow-hidden bg-surface-container">
+                    <img src="{{ post.thumbnail }}" alt="{{ post.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                </div>
+                {% else %}
+                <div class="aspect-video bg-primary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-white/20 text-6xl">article</span>
+                </div>
+                {% endif %}
+                <div class="p-6 flex flex-col flex-1">
+                    <div class="flex items-center gap-2 mb-3 flex-wrap">
+                        {% for tag in post.tags[:3] %}
+                        <span class="font-label text-[10px] uppercase tracking-widest bg-surface-container px-2 py-0.5 rounded-full text-on-surface-variant">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    <h2 class="font-headline font-bold text-lg text-on-surface mb-2 group-hover:text-secondary transition-colors leading-snug">{{ post.title }}</h2>
+                    <p class="text-sm text-on-surface-variant mb-4 flex-1">{{ post.description }}</p>
+                    <div class="flex items-center justify-between mt-auto">
+                        <span class="font-label text-xs text-on-surface-variant">
+                            {% if post.date %}{{ post.date.strftime('%b %d, %Y') if post.date.strftime is defined else post.date }}{% endif %}
+                        </span>
+                        <span class="font-label text-xs font-semibold text-secondary group-hover:underline">Read →</span>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-24 text-on-surface-variant">
+            <span class="material-symbols-outlined text-5xl mb-4 block">article</span>
+            <p class="font-headline text-xl">Articles coming soon.</p>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="py-16 bg-surface-container-low">
+    <div class="max-w-3xl mx-auto px-6 text-center">
+        <h2 class="font-headline text-3xl font-black mb-4">Never miss a federal contract.</h2>
+        <p class="text-on-surface-variant mb-8">TenderSentinel monitors SAM.gov daily and sends you only the opportunities that match your NAICS codes and keywords.</p>
+        <a href="/cadastro" class="inline-block px-8 py-4 bg-primary text-white font-headline font-bold rounded-lg hover:opacity-90 transition-opacity">Start Free Trial</a>
+    </div>
+</section>
+{% endblock %}

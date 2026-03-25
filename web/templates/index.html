@@ -230,28 +230,26 @@
 <div class="max-w-7xl mx-auto px-6">
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <!-- Large card -->
-        <div class="lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 flex flex-col justify-between overflow-hidden relative border border-outline-variant/10 group reveal">
-            <div class="relative z-10 max-w-md">
+        <div class="lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 flex flex-col gap-8 overflow-hidden border border-outline-variant/10 group reveal">
+            <div>
                 <div class="inline-block px-3 py-1 bg-on-tertiary-container/10 rounded-full mb-4">
                     <span class="font-label text-[10px] text-on-tertiary-container font-bold uppercase tracking-wider">NAICS + Set-Aside Matching</span>
                 </div>
                 <h3 class="font-headline text-3xl font-bold mb-4">Intelligent Opportunity Scoring</h3>
-                <p class="text-on-surface-variant mb-6">Our engine scores every contract against your business profile — NAICS codes, set-aside eligibility (SBA, SDVOSB, WOSB, 8a, HUBZone), and contract value — so you always know which opportunities to prioritize.</p>
+                <p class="text-on-surface-variant">Our engine scores every contract against your business profile — NAICS codes, set-aside eligibility (SBA, SDVOSB, WOSB, 8a, HUBZone), and contract value — so you always know which opportunities to prioritize.</p>
             </div>
-            <div class="lg:absolute lg:bottom-0 lg:right-0 w-full lg:w-1/2 p-4 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-                <div class="bg-surface p-4 rounded-t-xl shadow-lg border-x border-t border-outline-variant/10">
-                    <div class="flex items-center justify-between mb-4">
-                        <span class="font-label text-[10px] text-on-surface-variant">Relevance Score</span>
-                        <span class="text-secondary font-bold font-label">9 / 10</span>
-                    </div>
-                    <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
-                        <div class="h-full bg-secondary w-[90%]"></div>
-                    </div>
-                    <div class="mt-4 grid grid-cols-3 gap-2 text-[10px] font-label text-on-surface-variant">
-                        <div class="bg-surface-container-high rounded p-2 text-center">NAICS ✓</div>
-                        <div class="bg-surface-container-high rounded p-2 text-center">SDVOSB ✓</div>
-                        <div class="bg-secondary/20 rounded p-2 text-center">Keywords ✓</div>
-                    </div>
+            <div class="bg-surface p-5 rounded-xl shadow-sm border border-outline-variant/10 translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="font-label text-[10px] text-on-surface-variant uppercase tracking-widest">Relevance Score</span>
+                    <span class="text-secondary font-bold font-label text-lg">9 / 10</span>
+                </div>
+                <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden mb-4">
+                    <div class="h-full bg-secondary w-[90%] rounded-full"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-[10px] font-label text-on-surface-variant">
+                    <div class="bg-surface-container-high rounded p-2 text-center">NAICS ✓</div>
+                    <div class="bg-surface-container-high rounded p-2 text-center">SDVOSB ✓</div>
+                    <div class="bg-secondary/20 rounded p-2 text-center">Keywords ✓</div>
                 </div>
             </div>
         </div>
@@ -437,6 +435,38 @@
 </div>
 </section>
 
+<!-- GovCon Insights Blog Preview -->
+<section class="py-24 bg-surface" id="blog">
+<div class="max-w-7xl mx-auto px-6">
+    <div class="flex items-end justify-between mb-12 reveal">
+        <div>
+            <div class="font-label text-xs uppercase tracking-widest text-secondary mb-2">GovCon Insights</div>
+            <h2 class="font-headline text-4xl font-black tracking-tight">Federal contracting,<br>demystified.</h2>
+        </div>
+        <a href="/blog" class="hidden md:flex items-center gap-2 font-label text-sm font-semibold text-on-surface-variant hover:text-secondary transition-colors">
+            View all articles <span class="material-symbols-outlined text-base">arrow_forward</span>
+        </a>
+    </div>
+    <div id="blog-preview-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6 reveal reveal-delay-1">
+        <div class="bg-surface-container-low rounded-xl border border-outline-variant/10 overflow-hidden flex flex-col animate-pulse">
+            <div class="aspect-video bg-surface-container"></div>
+            <div class="p-6"><div class="h-4 bg-surface-container rounded w-3/4 mb-3"></div><div class="h-3 bg-surface-container rounded w-full mb-2"></div><div class="h-3 bg-surface-container rounded w-2/3"></div></div>
+        </div>
+        <div class="bg-surface-container-low rounded-xl border border-outline-variant/10 overflow-hidden flex flex-col animate-pulse hidden md:flex">
+            <div class="aspect-video bg-surface-container"></div>
+            <div class="p-6"><div class="h-4 bg-surface-container rounded w-3/4 mb-3"></div><div class="h-3 bg-surface-container rounded w-full mb-2"></div><div class="h-3 bg-surface-container rounded w-2/3"></div></div>
+        </div>
+        <div class="bg-surface-container-low rounded-xl border border-outline-variant/10 overflow-hidden flex flex-col animate-pulse hidden md:flex">
+            <div class="aspect-video bg-surface-container"></div>
+            <div class="p-6"><div class="h-4 bg-surface-container rounded w-3/4 mb-3"></div><div class="h-3 bg-surface-container rounded w-full mb-2"></div><div class="h-3 bg-surface-container rounded w-2/3"></div></div>
+        </div>
+    </div>
+    <div class="text-center mt-8 md:hidden reveal">
+        <a href="/blog" class="font-label text-sm font-semibold text-secondary">View all articles →</a>
+    </div>
+</div>
+</section>
+
 <!-- Newsletter / CTA -->
 <section class="py-24 bg-primary text-white" id="newsletter">
 <div class="max-w-4xl mx-auto px-6 text-center">
@@ -586,6 +616,31 @@ function assinar(plano) {
     window.location.href = `/cadastro`;
 {% endif %}
 }
+
+// Blog preview — fetch 3 most recent posts
+fetch('/api/blog/preview')
+    .then(r => r.ok ? r.json() : [])
+    .then(posts => {
+        if (!posts.length) return;
+        const grid = document.getElementById('blog-preview-grid');
+        grid.innerHTML = posts.map((p, i) => `
+            <a href="/blog/${p.slug}" class="group bg-white rounded-xl border border-outline-variant/20 overflow-hidden hover:shadow-lg hover:border-outline-variant/50 transition-all flex flex-col ${i > 0 ? 'hidden md:flex' : ''}">
+                ${p.thumbnail
+                    ? `<div class="aspect-video overflow-hidden"><img src="${p.thumbnail}" alt="${p.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/></div>`
+                    : `<div class="aspect-video bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-white/20 text-5xl">article</span></div>`
+                }
+                <div class="p-6 flex flex-col flex-1">
+                    <div class="flex gap-2 mb-3 flex-wrap">
+                        ${(p.tags||[]).slice(0,2).map(t => `<span class="font-label text-[10px] uppercase tracking-widest bg-surface-container px-2 py-0.5 rounded-full text-on-surface-variant">${t}</span>`).join('')}
+                    </div>
+                    <h3 class="font-headline font-bold text-base text-on-surface mb-2 group-hover:text-secondary transition-colors leading-snug">${p.title}</h3>
+                    <p class="text-sm text-on-surface-variant mb-4 flex-1">${p.description}</p>
+                    <span class="font-label text-xs font-semibold text-secondary">Read →</span>
+                </div>
+            </a>
+        `).join('');
+    })
+    .catch(() => {});
 </script>
 </body>
 </html>
