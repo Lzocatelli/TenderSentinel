@@ -161,7 +161,7 @@ def contar_licitacoes_hoje():
 
 @app.route("/")
 def index():
-    return render_template("index.html", total_hoje=0)
+    return render_template("index.html", total_hoje=contar_licitacoes_hoje())
 
 
 @app.route("/api/contador")
