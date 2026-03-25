@@ -4,7 +4,7 @@ description: "The Federal Acquisition Regulation is going through its biggest ov
 date: 2026-03-19
 tags: ["FAR", "Federal Contracting", "Regulation", "Small Business"]
 author: "TenderSentinel"
-thumbnail: ""
+thumbnail: "/static/far.jpg"
 ---
 
 If you hold a federal contract or plan to bid on one this year, pay attention.

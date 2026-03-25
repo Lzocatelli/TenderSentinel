@@ -4,7 +4,7 @@ description: "28.8% of all federal contracting dollars went to small businesses 
 date: 2026-03-17
 tags: ["GovCon", "Small Business", "Federal Contracting"]
 author: "TenderSentinel"
-thumbnail: ""
+thumbnail: "/static/183-billion.jpg"
 ---
 
 $183 billion in prime contracts went to small businesses in FY2024.

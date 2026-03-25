@@ -4,7 +4,7 @@ description: "SAM.gov doesn't wait for business hours. Most small businesses eit
 date: 2026-03-21
 tags: ["GovCon", "SAM.gov", "Small Business", "Federal Contracting"]
 author: "TenderSentinel"
-thumbnail: ""
+thumbnail: "/static/2am-contract.jpg"
 ---
 
 That's the reality of federal contracting.
