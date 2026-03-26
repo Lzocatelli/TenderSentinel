@@ -1,0 +1,322 @@
+{% extends "blog/base.html" %}
+
+{% block title %}Company Profile | TenderSentinel{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-6 py-12">
+    <h1 class="font-headline text-3xl font-black mb-2">Company Profile</h1>
+    <p class="text-on-surface-variant mb-10">Complete your profile to get personalized match scores on every opportunity.</p>
+
+    <!-- Step Indicator -->
+    <div class="flex items-center gap-2 mb-10 font-label text-sm">
+        <button onclick="showStep(1)" id="step-btn-1" class="px-4 py-2 rounded bg-primary text-white font-semibold">1. Company</button>
+        <span class="text-outline">&rarr;</span>
+        <button onclick="showStep(2)" id="step-btn-2" class="px-4 py-2 rounded bg-surface-container text-on-surface-variant font-semibold">2. NAICS</button>
+        <span class="text-outline">&rarr;</span>
+        <button onclick="showStep(3)" id="step-btn-3" class="px-4 py-2 rounded bg-surface-container text-on-surface-variant font-semibold">3. Certs</button>
+        <span class="text-outline">&rarr;</span>
+        <button onclick="showStep(4)" id="step-btn-4" class="px-4 py-2 rounded bg-surface-container text-on-surface-variant font-semibold">4. Keywords</button>
+        <span class="text-outline">&rarr;</span>
+        <button onclick="showStep(5)" id="step-btn-5" class="px-4 py-2 rounded bg-surface-container text-on-surface-variant font-semibold">5. Past Perf.</button>
+    </div>
+
+    <div id="msg" class="hidden mb-6 p-4 rounded bg-green-50 text-green-800 font-label text-sm"></div>
+
+    <!-- Step 1: Company Basics -->
+    <div id="step-1" class="step-panel">
+        <h2 class="font-headline text-xl font-bold mb-6">Company Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block font-label text-sm font-semibold mb-1">Company Name</label>
+                <input type="text" id="company_name" class="w-full border border-outline-variant rounded px-3 py-2 font-body"/>
+            </div>
+            <div>
+                <label class="block font-label text-sm font-semibold mb-1">CAGE Code</label>
+                <input type="text" id="cage_code" maxlength="10" class="w-full border border-outline-variant rounded px-3 py-2 font-body"/>
+            </div>
+            <div>
+                <label class="block font-label text-sm font-semibold mb-1">UEI</label>
+                <input type="text" id="uei" maxlength="20" class="w-full border border-outline-variant rounded px-3 py-2 font-body"/>
+            </div>
+            <div>
+                <label class="block font-label text-sm font-semibold mb-1">SAM.gov Registered?</label>
+                <select id="sam_registered" class="w-full border border-outline-variant rounded px-3 py-2 font-body">
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-label text-sm font-semibold mb-1">Employee Count</label>
+                <select id="employee_count_range" class="w-full border border-outline-variant rounded px-3 py-2 font-body">
+                    <option value="">Select...</option>
+                    <option value="1-50">1-50</option>
+                    <option value="51-250">51-250</option>
+                    <option value="251-500">251-500</option>
+                    <option value="500+">500+</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-label text-sm font-semibold mb-1">Annual Revenue</label>
+                <select id="annual_revenue_range" class="w-full border border-outline-variant rounded px-3 py-2 font-body">
+                    <option value="">Select...</option>
+                    <option value="<1M">Less than $1M</option>
+                    <option value="1M-5M">$1M - $5M</option>
+                    <option value="5M-25M">$5M - $25M</option>
+                    <option value="25M+">$25M+</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-label text-sm font-semibold mb-1">Years in Business</label>
+                <input type="number" id="years_in_business" min="0" class="w-full border border-outline-variant rounded px-3 py-2 font-body"/>
+            </div>
+        </div>
+        <button onclick="saveProfile()" class="mt-8 px-6 py-3 bg-primary text-white font-headline font-bold rounded hover:opacity-90">Save &amp; Continue</button>
+    </div>
+
+    <!-- Step 2: NAICS Codes -->
+    <div id="step-2" class="step-panel hidden">
+        <h2 class="font-headline text-xl font-bold mb-6">NAICS Codes</h2>
+        <p class="text-on-surface-variant text-sm mb-4">Add your NAICS codes. Mark one as primary for higher scoring weight.</p>
+        <div id="naics-list" class="space-y-3 mb-4"></div>
+        <div class="flex gap-2">
+            <input type="text" id="new-naics" placeholder="e.g. 541512" maxlength="10" class="border border-outline-variant rounded px-3 py-2 font-body w-40"/>
+            <label class="flex items-center gap-1 font-label text-sm"><input type="checkbox" id="new-naics-primary"/> Primary</label>
+            <button onclick="addNaics()" class="px-4 py-2 bg-surface-container text-on-surface font-label text-sm font-semibold rounded hover:bg-surface-container-high">Add</button>
+        </div>
+        <button onclick="saveNaics()" class="mt-8 px-6 py-3 bg-primary text-white font-headline font-bold rounded hover:opacity-90">Save &amp; Continue</button>
+    </div>
+
+    <!-- Step 3: Certifications -->
+    <div id="step-3" class="step-panel hidden">
+        <h2 class="font-headline text-xl font-bold mb-6">Set-Aside Certifications</h2>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="certs-grid">
+            {% for cert in ["SBA", "8a", "SDVOSB", "WOSB", "EDWOSB", "HUBZone"] %}
+            <label class="flex items-center gap-3 p-4 border border-outline-variant rounded hover:bg-surface-container-low cursor-pointer">
+                <input type="checkbox" value="{{ cert }}" class="cert-checkbox"/>
+                <span class="font-label font-semibold">{{ cert }}</span>
+            </label>
+            {% endfor %}
+        </div>
+        <button onclick="saveCerts()" class="mt-8 px-6 py-3 bg-primary text-white font-headline font-bold rounded hover:opacity-90">Save &amp; Continue</button>
+    </div>
+
+    <!-- Step 4: Keywords -->
+    <div id="step-4" class="step-panel hidden">
+        <h2 class="font-headline text-xl font-bold mb-6">Keywords &amp; Capabilities</h2>
+        <p class="text-on-surface-variant text-sm mb-4">Add keywords that describe your services. Adjust weight (0.1-2.0) to boost or reduce importance.</p>
+        <div id="keywords-list" class="space-y-3 mb-4"></div>
+        <div class="flex gap-2">
+            <input type="text" id="new-keyword" placeholder="e.g. cloud computing" class="border border-outline-variant rounded px-3 py-2 font-body flex-1"/>
+            <input type="number" id="new-keyword-weight" value="1.0" min="0.1" max="2.0" step="0.1" class="border border-outline-variant rounded px-3 py-2 font-body w-20"/>
+            <button onclick="addKeyword()" class="px-4 py-2 bg-surface-container text-on-surface font-label text-sm font-semibold rounded hover:bg-surface-container-high">Add</button>
+        </div>
+        <button onclick="saveKeywords()" class="mt-8 px-6 py-3 bg-primary text-white font-headline font-bold rounded hover:opacity-90">Save &amp; Continue</button>
+    </div>
+
+    <!-- Step 5: Past Performance -->
+    <div id="step-5" class="step-panel hidden">
+        <h2 class="font-headline text-xl font-bold mb-6">Past Performance (Optional)</h2>
+        <p class="text-on-surface-variant text-sm mb-4">Add past contracts to improve match scoring accuracy.</p>
+        <div id="past-perf-list" class="space-y-3 mb-6"></div>
+        <div class="bg-surface-container-low p-6 rounded-xl space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block font-label text-sm font-semibold mb-1">Contract Number</label>
+                    <input type="text" id="pp-contract" class="w-full border border-outline-variant rounded px-3 py-2 font-body"/>
+                </div>
+                <div>
+                    <label class="block font-label text-sm font-semibold mb-1">Agency</label>
+                    <input type="text" id="pp-agency" class="w-full border border-outline-variant rounded px-3 py-2 font-body"/>
+                </div>
+                <div>
+                    <label class="block font-label text-sm font-semibold mb-1">NAICS Code</label>
+                    <input type="text" id="pp-naics" maxlength="10" class="w-full border border-outline-variant rounded px-3 py-2 font-body"/>
+                </div>
+                <div>
+                    <label class="block font-label text-sm font-semibold mb-1">Contract Value ($)</label>
+                    <input type="number" id="pp-value" class="w-full border border-outline-variant rounded px-3 py-2 font-body"/>
+                </div>
+            </div>
+            <div>
+                <label class="block font-label text-sm font-semibold mb-1">Description</label>
+                <textarea id="pp-desc" rows="2" class="w-full border border-outline-variant rounded px-3 py-2 font-body"></textarea>
+            </div>
+            <button onclick="addPastPerf()" class="px-4 py-2 bg-surface-container text-on-surface font-label text-sm font-semibold rounded hover:bg-surface-container-high">Add Past Performance</button>
+        </div>
+        <a href="/dashboard" class="mt-8 inline-block px-6 py-3 bg-primary text-white font-headline font-bold rounded hover:opacity-90">Finish Setup</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const csrf = "{{ session.get('_csrf_token', '') }}";
+const naicsCodes = [];
+const keywords = [];
+const pastPerfs = [];
+
+function showStep(n) {
+    document.querySelectorAll('.step-panel').forEach(el => el.classList.add('hidden'));
+    document.getElementById('step-' + n).classList.remove('hidden');
+    for (let i = 1; i <= 5; i++) {
+        const btn = document.getElementById('step-btn-' + i);
+        btn.className = i === n
+            ? 'px-4 py-2 rounded bg-primary text-white font-semibold'
+            : 'px-4 py-2 rounded bg-surface-container text-on-surface-variant font-semibold';
+    }
+}
+
+function showMsg(text) {
+    const el = document.getElementById('msg');
+    el.textContent = text;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+async function api(url, method, body) {
+    const resp = await fetch(url, {
+        method,
+        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+        body: body ? JSON.stringify(body) : undefined,
+    });
+    return resp.json();
+}
+
+// Step 1
+async function saveProfile() {
+    await api('/api/v1/profile', 'POST', {
+        company_name: document.getElementById('company_name').value,
+        cage_code: document.getElementById('cage_code').value,
+        uei: document.getElementById('uei').value,
+        sam_registered: document.getElementById('sam_registered').value === 'true',
+        employee_count_range: document.getElementById('employee_count_range').value,
+        annual_revenue_range: document.getElementById('annual_revenue_range').value,
+        years_in_business: parseInt(document.getElementById('years_in_business').value) || null,
+    });
+    showMsg('Profile saved!');
+    showStep(2);
+}
+
+// Step 2
+function renderNaics() {
+    const list = document.getElementById('naics-list');
+    list.innerHTML = naicsCodes.map((n, i) => `
+        <div class="flex items-center gap-3 bg-surface-container-low p-3 rounded">
+            <span class="font-label font-bold">${n.code}</span>
+            ${n.is_primary ? '<span class="text-xs bg-secondary text-white px-2 py-0.5 rounded">Primary</span>' : ''}
+            <button onclick="naicsCodes.splice(${i},1);renderNaics()" class="ml-auto text-red-500 font-label text-sm">Remove</button>
+        </div>
+    `).join('');
+}
+
+function addNaics() {
+    const code = document.getElementById('new-naics').value.trim();
+    if (!code || !/^\d+$/.test(code)) return;
+    const isPrimary = document.getElementById('new-naics-primary').checked;
+    if (isPrimary) naicsCodes.forEach(n => n.is_primary = false);
+    naicsCodes.push({code, is_primary: isPrimary});
+    document.getElementById('new-naics').value = '';
+    document.getElementById('new-naics-primary').checked = false;
+    renderNaics();
+}
+
+async function saveNaics() {
+    await api('/api/v1/profile/naics', 'PUT', {naics_codes: naicsCodes});
+    showMsg('NAICS codes saved!');
+    showStep(3);
+}
+
+// Step 3
+async function saveCerts() {
+    const certs = [];
+    document.querySelectorAll('.cert-checkbox:checked').forEach(el => {
+        certs.push({type: el.value});
+    });
+    await api('/api/v1/profile/certifications', 'PUT', {certifications: certs});
+    showMsg('Certifications saved!');
+    showStep(4);
+}
+
+// Step 4
+function renderKeywords() {
+    const list = document.getElementById('keywords-list');
+    list.innerHTML = keywords.map((k, i) => `
+        <div class="flex items-center gap-3 bg-surface-container-low p-3 rounded">
+            <span class="font-label font-semibold">${k.keyword}</span>
+            <span class="text-xs text-on-surface-variant">weight: ${k.weight}</span>
+            <button onclick="keywords.splice(${i},1);renderKeywords()" class="ml-auto text-red-500 font-label text-sm">Remove</button>
+        </div>
+    `).join('');
+}
+
+function addKeyword() {
+    const kw = document.getElementById('new-keyword').value.trim();
+    if (!kw) return;
+    const weight = parseFloat(document.getElementById('new-keyword-weight').value) || 1.0;
+    keywords.push({keyword: kw, weight: Math.max(0.1, Math.min(2.0, weight))});
+    document.getElementById('new-keyword').value = '';
+    renderKeywords();
+}
+
+async function saveKeywords() {
+    await api('/api/v1/profile/keywords', 'PUT', {keywords});
+    showMsg('Keywords saved!');
+    showStep(5);
+}
+
+// Step 5
+function renderPastPerf() {
+    const list = document.getElementById('past-perf-list');
+    list.innerHTML = pastPerfs.map((p, i) => `
+        <div class="bg-surface-container-low p-4 rounded">
+            <div class="font-label font-semibold">${p.contract_number || 'N/A'} &mdash; ${p.agency || 'N/A'}</div>
+            <div class="text-sm text-on-surface-variant">NAICS: ${p.naics_code || 'N/A'} | Value: ${p.contract_value ? '$' + Number(p.contract_value).toLocaleString() : 'N/A'}</div>
+        </div>
+    `).join('');
+}
+
+async function addPastPerf() {
+    const data = {
+        contract_number: document.getElementById('pp-contract').value,
+        agency: document.getElementById('pp-agency').value,
+        naics_code: document.getElementById('pp-naics').value,
+        contract_value: parseFloat(document.getElementById('pp-value').value) || null,
+        description: document.getElementById('pp-desc').value,
+    };
+    await api('/api/v1/profile/past-performance', 'POST', data);
+    pastPerfs.push(data);
+    renderPastPerf();
+    ['pp-contract','pp-agency','pp-naics','pp-value','pp-desc'].forEach(id => document.getElementById(id).value = '');
+    showMsg('Past performance added!');
+}
+
+// Load existing profile on page load
+(async function() {
+    const data = await api('/api/v1/profile', 'GET');
+    if (data.profile) {
+        const p = data.profile;
+        document.getElementById('company_name').value = p.company_name || '';
+        document.getElementById('cage_code').value = p.cage_code || '';
+        document.getElementById('uei').value = p.uei || '';
+        document.getElementById('sam_registered').value = p.sam_registered ? 'true' : 'false';
+        document.getElementById('employee_count_range').value = p.employee_count_range || '';
+        document.getElementById('annual_revenue_range').value = p.annual_revenue_range || '';
+        document.getElementById('years_in_business').value = p.years_in_business || '';
+
+        (p.naics_codes || []).forEach(n => naicsCodes.push(n));
+        renderNaics();
+
+        (p.certifications || []).forEach(c => {
+            const cb = document.querySelector(`.cert-checkbox[value="${c.type}"]`);
+            if (cb) cb.checked = true;
+        });
+
+        (p.keywords || []).forEach(k => keywords.push(k));
+        renderKeywords();
+
+        (p.past_performance || []).forEach(pp => pastPerfs.push(pp));
+        renderPastPerf();
+    }
+})();
+</script>
+{% endblock %}

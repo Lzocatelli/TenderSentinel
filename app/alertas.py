@@ -74,15 +74,33 @@ def send_email(recipient, subject, body):
         return False
 
 
-def _build_opportunity_card(agency, title, value, link):
+def _score_badge_html(score):
+    """Generate a color-coded match score badge for emails."""
+    if score is None:
+        return ""
+    if score >= 8:
+        bg, color = "#dcfce7", "#166534"
+    elif score >= 5:
+        bg, color = "#fef9c3", "#854d0e"
+    else:
+        bg, color = "#f1f5f9", "#64748b"
+    return (
+        f'<span style="display:inline-block;background:{bg};color:{color};'
+        f'font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;'
+        f'margin-left:8px">{score:.1f}/10</span>'
+    )
+
+
+def _build_opportunity_card(agency, title, value, link, score=None):
     agency_s = html.escape(str(agency or "N/A"))
     title_raw = str(title or "N/A")
     title_s = html.escape(title_raw[:280] + ("…" if len(title_raw) > 280 else ""))
     value_s = format_currency(value)
     link_s = html.escape(str(link or "#"))
+    badge = _score_badge_html(score)
     return f"""
     <div style="border:1px solid #e2e8f0;border-radius:10px;padding:16px 18px;margin-bottom:12px;background:#ffffff">
-        <p style="font-size:14px;font-weight:600;color:#0f1f3d;margin:0 0 6px;line-height:1.45">{title_s}</p>
+        <p style="font-size:14px;font-weight:600;color:#0f1f3d;margin:0 0 6px;line-height:1.45">{title_s}{badge}</p>
         <p style="font-size:12px;color:#64748b;margin:0 0 12px">
             {agency_s} &nbsp;·&nbsp; <strong style="color:#0f1f3d">{value_s}</strong>
         </p>
@@ -133,8 +151,24 @@ def dispatch_alerts():
         if not new_matches:
             continue
 
+        # Fetch match scores for this user's new matches
+        match_ids = [m[0] for m in new_matches]
+        scores_map = {}
+        try:
+            cur.execute("""
+                SELECT opportunity_id, overall_score
+                FROM opportunity_match_scores
+                WHERE user_id = %s AND opportunity_id = ANY(%s)
+            """, (client_id, match_ids))
+            scores_map = {row[0]: float(row[1]) for row in cur.fetchall()}
+        except Exception:
+            pass  # Scores are optional; proceed without them
+
         first_name = html.escape(name.split()[0]) if name else "there"
-        cards = "".join(_build_opportunity_card(m[2], m[3], m[4], m[5]) for m in new_matches)
+        cards = "".join(
+            _build_opportunity_card(m[2], m[3], m[4], m[5], score=scores_map.get(m[0]))
+            for m in new_matches
+        )
         count = len(new_matches)
         plural = "opportunity" if count == 1 else "opportunities"
         body = f"""<!DOCTYPE html>
@@ -174,7 +208,11 @@ def dispatch_alerts():
 </div>
 </body>
 </html>"""
-        subject = f"TenderSentinel — {count} new contract {plural} for you"
+        top_score = max(scores_map.values()) if scores_map else None
+        if top_score and top_score >= 7:
+            subject = f"TenderSentinel — {top_score:.1f}/10 Match: {count} new contract {plural}"
+        else:
+            subject = f"TenderSentinel — {count} new contract {plural} for you"
         sent = send_email(email, subject, body)
 
         if sent:

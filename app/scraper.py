@@ -67,6 +67,7 @@ def save_opportunities(opportunities):
     conn = get_connection()
     cur = conn.cursor()
     saved = 0
+    new_ids = []
 
     for item in opportunities:
         try:
@@ -97,6 +98,14 @@ def save_opportunities(opportunities):
             ))
             if cur.rowcount > 0:
                 saved += 1
+                # Get the ID for scoring pipeline
+                cur.execute(
+                    "SELECT id FROM licitacoes WHERE sam_id = %s",
+                    (item.get("noticeId"),),
+                )
+                row = cur.fetchone()
+                if row:
+                    new_ids.append(row[0])
         except Exception as e:
             logger.error(f"Error saving opportunity: {e}")
             conn.rollback()
@@ -106,6 +115,20 @@ def save_opportunities(opportunities):
     cur.close()
     release_connection(conn)
     logger.info(f"{saved} new opportunities saved")
+
+    # Trigger scoring & value estimation for new opportunities
+    if new_ids:
+        try:
+            from app.services.scoring_pipeline import (
+                score_opportunity_for_all_users,
+                estimate_opportunity_value,
+            )
+            for opp_id in new_ids:
+                estimate_opportunity_value(opp_id)
+                score_opportunity_for_all_users(opp_id)
+        except Exception as e:
+            logger.warning(f"Scoring pipeline error (non-blocking): {e}")
+
     return saved
 
 

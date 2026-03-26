@@ -1,0 +1,175 @@
+{% extends "blog/base.html" %}
+
+{% block title %}Pipeline | TenderSentinel{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-6 py-12">
+    <div class="flex items-center justify-between mb-10">
+        <div>
+            <h1 class="font-headline text-3xl font-black">Pipeline</h1>
+            <p class="text-on-surface-variant text-sm mt-1">Triage opportunities: Go, Consider, or Skip</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/dashboard/profile" class="px-4 py-2 bg-surface-container text-on-surface font-label text-sm font-semibold rounded hover:bg-surface-container-high">Edit Profile</a>
+            <button onclick="rescore()" id="rescore-btn" class="px-4 py-2 bg-primary text-white font-label text-sm font-semibold rounded hover:opacity-90">Rescore All</button>
+        </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div id="stats-bar" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+            <div class="font-headline text-2xl font-black text-green-700" id="stat-go">0</div>
+            <div class="font-label text-xs text-green-600 uppercase tracking-widest">Go</div>
+            <div class="font-label text-xs text-green-500 mt-1" id="stat-go-value">$0</div>
+        </div>
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center">
+            <div class="font-headline text-2xl font-black text-yellow-700" id="stat-consider">0</div>
+            <div class="font-label text-xs text-yellow-600 uppercase tracking-widest">Consider</div>
+            <div class="font-label text-xs text-yellow-500 mt-1" id="stat-consider-value">$0</div>
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
+            <div class="font-headline text-2xl font-black text-slate-600" id="stat-skip">0</div>
+            <div class="font-label text-xs text-slate-500 uppercase tracking-widest">Skip</div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+            <div class="font-headline text-2xl font-black text-blue-700" id="stat-unclassified">0</div>
+            <div class="font-label text-xs text-blue-600 uppercase tracking-widest">Unclassified</div>
+        </div>
+    </div>
+
+    <!-- Pipeline sections -->
+    <div id="pipeline-content">
+        <div class="text-center py-16 text-on-surface-variant">
+            <span class="material-symbols-outlined text-4xl mb-2 block animate-spin">progress_activity</span>
+            <p>Loading pipeline...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const csrf = "{{ session.get('_csrf_token', '') }}";
+
+function scoreColor(score) {
+    if (score >= 8) return 'text-green-600 bg-green-50 border-green-200';
+    if (score >= 5) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    return 'text-slate-500 bg-slate-50 border-slate-200';
+}
+
+function scoreBadge(score) {
+    if (!score) return '';
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded border font-label text-sm font-bold ${scoreColor(score)}">${score.toFixed(1)}/10</span>`;
+}
+
+function confidenceDot(c) {
+    const colors = {high: 'text-green-500', medium: 'text-yellow-500', low: 'text-red-500'};
+    return `<span class="${colors[c] || 'text-slate-400'}">&#9679;</span> ${c || 'N/A'}`;
+}
+
+function fmtValue(v) {
+    if (!v) return 'N/A';
+    if (v >= 1_000_000) return '$' + (v / 1_000_000).toFixed(1) + 'M';
+    if (v >= 1_000) return '$' + (v / 1_000).toFixed(0) + 'K';
+    return '$' + v.toFixed(0);
+}
+
+function oppCard(opp) {
+    const score = opp.overall_score;
+    const ev = opp.estimated_value_mid;
+    const evLow = opp.estimated_value_low;
+    const evHigh = opp.estimated_value_high;
+
+    return `
+    <div class="bg-white border border-outline-variant/20 rounded-xl p-5 hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between gap-4 mb-3">
+            <div class="flex-1 min-w-0">
+                <h3 class="font-headline font-bold text-base leading-snug truncate">${opp.title || 'Untitled'}</h3>
+                <p class="font-label text-xs text-on-surface-variant mt-1">${opp.agency || ''}</p>
+            </div>
+            ${score ? scoreBadge(score) : ''}
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant font-label mb-4">
+            ${opp.naics_code ? `<span>NAICS: ${opp.naics_code}</span>` : ''}
+            ${opp.set_aside ? `<span>Set-aside: ${opp.set_aside}</span>` : ''}
+            ${opp.deadline ? `<span>Deadline: ${opp.deadline}</span>` : ''}
+            ${ev ? `<span>Est: ${fmtValue(evLow)}-${fmtValue(evHigh)} (${confidenceDot(opp.estimation_confidence)})</span>` : ''}
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="decide(${opp.id},'go',this)" class="px-3 py-1.5 rounded font-label text-xs font-semibold ${opp.decision === 'go' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'}">GO</button>
+            <button onclick="decide(${opp.id},'consider',this)" class="px-3 py-1.5 rounded font-label text-xs font-semibold ${opp.decision === 'consider' ? 'bg-yellow-500 text-white' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'}">CONSIDER</button>
+            <button onclick="decide(${opp.id},'skip',this)" class="px-3 py-1.5 rounded font-label text-xs font-semibold ${opp.decision === 'skip' ? 'bg-slate-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}">SKIP</button>
+            ${opp.link ? `<a href="${opp.link}" target="_blank" class="ml-auto font-label text-xs text-secondary hover:underline">View on SAM.gov &rarr;</a>` : ''}
+        </div>
+    </div>`;
+}
+
+function renderSection(title, opps, color, collapsed) {
+    if (!opps.length) return '';
+    const items = collapsed ? '' : opps.map(oppCard).join('');
+    return `
+    <div class="mb-8">
+        <h2 class="font-headline text-lg font-bold mb-4 flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full ${color}"></span>
+            ${title} (${opps.length})
+        </h2>
+        <div class="space-y-3">${items}</div>
+    </div>`;
+}
+
+async function loadPipeline() {
+    const [pipeline, stats] = await Promise.all([
+        fetch('/api/v1/pipeline').then(r => r.json()),
+        fetch('/api/v1/pipeline/stats').then(r => r.json()),
+    ]);
+
+    // Update stats
+    const d = stats.decisions || {};
+    document.getElementById('stat-go').textContent = d.go || 0;
+    document.getElementById('stat-consider').textContent = d.consider || 0;
+    document.getElementById('stat-skip').textContent = d.skip || 0;
+    document.getElementById('stat-unclassified').textContent = d.unclassified || 0;
+
+    const pv = stats.estimated_pipeline_value || {};
+    document.getElementById('stat-go-value').textContent = fmtValue(pv.go || 0);
+    document.getElementById('stat-consider-value').textContent = fmtValue(pv.consider || 0);
+
+    // Render pipeline
+    const content = document.getElementById('pipeline-content');
+    let html = '';
+    html += renderSection('Unclassified', pipeline.unclassified || [], 'bg-blue-500', false);
+    html += renderSection('Go', pipeline.go || [], 'bg-green-500', false);
+    html += renderSection('Consider', pipeline.consider || [], 'bg-yellow-500', false);
+    html += renderSection('Skip', pipeline.skip || [], 'bg-slate-400', true);
+
+    if (!html) html = '<div class="text-center py-16 text-on-surface-variant"><p>No opportunities in your pipeline yet.</p></div>';
+    content.innerHTML = html;
+}
+
+async function decide(oppId, decision, btn) {
+    await fetch(`/api/v1/opportunities/${oppId}/decision`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+        body: JSON.stringify({decision}),
+    });
+    loadPipeline();
+}
+
+async function rescore() {
+    const btn = document.getElementById('rescore-btn');
+    btn.textContent = 'Rescoring...';
+    btn.disabled = true;
+    await fetch('/api/v1/opportunities/rescore', {
+        method: 'POST',
+        headers: {'X-CSRF-Token': csrf},
+    });
+    setTimeout(() => {
+        btn.textContent = 'Rescore All';
+        btn.disabled = false;
+        loadPipeline();
+    }, 3000);
+}
+
+loadPipeline();
+</script>
+{% endblock %}

@@ -57,6 +57,11 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
 
+# Template globals
+@app.context_processor
+def inject_now():
+    return {"now": datetime.now()}
+
 # HTTPS redirect for production (Q10)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
@@ -1085,6 +1090,385 @@ Allow: /
 Sitemap: {base_url}/sitemap.xml
 """
     return Response(content, mimetype="text/plain")
+
+
+# ── Company Profile API ──────────────────────────────────────────────────────
+
+@app.route("/api/v1/profile", methods=["GET", "POST"])
+@login_required
+def api_profile():
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        if request.method == "GET":
+            cur.execute("""
+                SELECT id, company_name, cage_code, uei, sam_registered,
+                       employee_count_range, annual_revenue_range, years_in_business
+                FROM company_profiles WHERE user_id = %s
+            """, (current_user.id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"profile": None})
+
+            profile_id = row[0]
+
+            cur.execute("SELECT naics_code, is_primary, proficiency FROM company_naics WHERE company_profile_id = %s", (profile_id,))
+            naics = [{"code": r[0], "is_primary": r[1], "proficiency": r[2]} for r in cur.fetchall()]
+
+            cur.execute("SELECT certification_type, certification_number, expiration_date FROM company_certifications WHERE company_profile_id = %s", (profile_id,))
+            certs = [{"type": r[0], "number": r[1], "expiration": str(r[2]) if r[2] else None} for r in cur.fetchall()]
+
+            cur.execute("SELECT keyword, weight FROM company_keywords WHERE company_profile_id = %s", (profile_id,))
+            keywords = [{"keyword": r[0], "weight": float(r[1])} for r in cur.fetchall()]
+
+            cur.execute("SELECT contract_number, agency, naics_code, contract_value, description FROM company_past_performance WHERE company_profile_id = %s", (profile_id,))
+            past_perf = [{"contract_number": r[0], "agency": r[1], "naics_code": r[2], "value": float(r[3]) if r[3] else None, "description": r[4]} for r in cur.fetchall()]
+
+            return jsonify({
+                "profile": {
+                    "company_name": row[1], "cage_code": row[2], "uei": row[3],
+                    "sam_registered": row[4], "employee_count_range": row[5],
+                    "annual_revenue_range": row[6], "years_in_business": row[7],
+                    "naics_codes": naics, "certifications": certs,
+                    "keywords": keywords, "past_performance": past_perf,
+                },
+            })
+
+        # POST: create or update profile
+        data = request.get_json(silent=True) or {}
+        cur.execute("""
+            INSERT INTO company_profiles
+                (user_id, company_name, cage_code, uei, sam_registered,
+                 employee_count_range, annual_revenue_range, years_in_business)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET
+                company_name = EXCLUDED.company_name,
+                cage_code = EXCLUDED.cage_code,
+                uei = EXCLUDED.uei,
+                sam_registered = EXCLUDED.sam_registered,
+                employee_count_range = EXCLUDED.employee_count_range,
+                annual_revenue_range = EXCLUDED.annual_revenue_range,
+                years_in_business = EXCLUDED.years_in_business,
+                updated_at = NOW()
+            RETURNING id
+        """, (
+            current_user.id,
+            data.get("company_name"),
+            data.get("cage_code"),
+            data.get("uei"),
+            data.get("sam_registered", False),
+            data.get("employee_count_range"),
+            data.get("annual_revenue_range"),
+            data.get("years_in_business"),
+        ))
+        profile_id = cur.fetchone()[0]
+        conn.commit()
+        return jsonify({"ok": True, "profile_id": profile_id})
+    finally:
+        cur.close()
+        release_connection(conn)
+
+
+@app.route("/api/v1/profile/naics", methods=["PUT"])
+@login_required
+def api_profile_naics():
+    data = request.get_json(silent=True) or {}
+    naics_list = data.get("naics_codes", [])
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id FROM company_profiles WHERE user_id = %s", (current_user.id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Create a company profile first"}), 400
+        profile_id = row[0]
+
+        cur.execute("DELETE FROM company_naics WHERE company_profile_id = %s", (profile_id,))
+        for n in naics_list:
+            cur.execute("""
+                INSERT INTO company_naics (company_profile_id, naics_code, is_primary, proficiency)
+                VALUES (%s, %s, %s, %s)
+            """, (profile_id, n["code"], n.get("is_primary", False), n.get("proficiency", "experienced")))
+
+        conn.commit()
+
+        # Trigger rescore in background
+        from app.services.scoring_pipeline import rescore_user_opportunities
+        t = threading.Thread(target=rescore_user_opportunities, args=(current_user.id,), daemon=True)
+        t.start()
+
+        return jsonify({"ok": True})
+    finally:
+        cur.close()
+        release_connection(conn)
+
+
+@app.route("/api/v1/profile/certifications", methods=["PUT"])
+@login_required
+def api_profile_certs():
+    data = request.get_json(silent=True) or {}
+    certs = data.get("certifications", [])
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id FROM company_profiles WHERE user_id = %s", (current_user.id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Create a company profile first"}), 400
+        profile_id = row[0]
+
+        cur.execute("DELETE FROM company_certifications WHERE company_profile_id = %s", (profile_id,))
+        for c in certs:
+            cur.execute("""
+                INSERT INTO company_certifications (company_profile_id, certification_type, certification_number, expiration_date)
+                VALUES (%s, %s, %s, %s)
+            """, (profile_id, c["type"], c.get("number"), c.get("expiration_date")))
+
+        conn.commit()
+
+        from app.services.scoring_pipeline import rescore_user_opportunities
+        t = threading.Thread(target=rescore_user_opportunities, args=(current_user.id,), daemon=True)
+        t.start()
+
+        return jsonify({"ok": True})
+    finally:
+        cur.close()
+        release_connection(conn)
+
+
+@app.route("/api/v1/profile/keywords", methods=["PUT"])
+@login_required
+def api_profile_keywords():
+    data = request.get_json(silent=True) or {}
+    keywords = data.get("keywords", [])
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id FROM company_profiles WHERE user_id = %s", (current_user.id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Create a company profile first"}), 400
+        profile_id = row[0]
+
+        cur.execute("DELETE FROM company_keywords WHERE company_profile_id = %s", (profile_id,))
+        for kw in keywords:
+            weight = max(0.1, min(2.0, float(kw.get("weight", 1.0))))
+            cur.execute("""
+                INSERT INTO company_keywords (company_profile_id, keyword, weight)
+                VALUES (%s, %s, %s)
+            """, (profile_id, kw["keyword"], weight))
+
+        conn.commit()
+
+        from app.services.scoring_pipeline import rescore_user_opportunities
+        t = threading.Thread(target=rescore_user_opportunities, args=(current_user.id,), daemon=True)
+        t.start()
+
+        return jsonify({"ok": True})
+    finally:
+        cur.close()
+        release_connection(conn)
+
+
+@app.route("/api/v1/profile/past-performance", methods=["POST"])
+@login_required
+def api_profile_past_perf():
+    data = request.get_json(silent=True) or {}
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id FROM company_profiles WHERE user_id = %s", (current_user.id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Create a company profile first"}), 400
+        profile_id = row[0]
+
+        cur.execute("""
+            INSERT INTO company_past_performance
+                (company_profile_id, contract_number, agency, naics_code, contract_value, description)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            profile_id,
+            data.get("contract_number"),
+            data.get("agency"),
+            data.get("naics_code"),
+            data.get("contract_value"),
+            data.get("description"),
+        ))
+        pp_id = cur.fetchone()[0]
+        conn.commit()
+        return jsonify({"ok": True, "id": pp_id})
+    finally:
+        cur.close()
+        release_connection(conn)
+
+
+# ── Match Score & Opportunity API ────────────────────────────────────────────
+
+@app.route("/api/v1/opportunities")
+@login_required
+def api_opportunities():
+    scored = request.args.get("scored") == "true"
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        if scored:
+            cur.execute("""
+                SELECT l.id, l.sam_id, l.orgao, l.objeto, l.valor, l.deadline,
+                       l.naics_code, l.set_aside, l.link,
+                       m.overall_score, m.naics_score, m.setaside_score,
+                       m.keyword_score, m.size_fit_score, m.past_perf_score,
+                       l.estimated_value_low, l.estimated_value_mid, l.estimated_value_high,
+                       l.estimation_confidence
+                FROM licitacoes l
+                LEFT JOIN opportunity_match_scores m
+                    ON m.opportunity_id = l.id AND m.user_id = %s
+                WHERE l.deadline >= CURRENT_DATE OR l.deadline IS NULL
+                ORDER BY COALESCE(m.overall_score, 0) DESC
+                LIMIT 100
+            """, (current_user.id,))
+        else:
+            cur.execute("""
+                SELECT id, sam_id, orgao, objeto, valor, deadline,
+                       naics_code, set_aside, link,
+                       NULL, NULL, NULL, NULL, NULL, NULL,
+                       estimated_value_low, estimated_value_mid, estimated_value_high,
+                       estimation_confidence
+                FROM licitacoes
+                WHERE deadline >= CURRENT_DATE OR deadline IS NULL
+                ORDER BY data_publicacao DESC
+                LIMIT 100
+            """)
+
+        opps = []
+        for row in cur.fetchall():
+            opp = {
+                "id": row[0], "sam_id": row[1], "agency": row[2],
+                "title": row[3],
+                "value": float(row[4]) if row[4] else None,
+                "deadline": str(row[5]) if row[5] else None,
+                "naics_code": row[6], "set_aside": row[7], "link": row[8],
+            }
+            if scored:
+                opp["match_score"] = {
+                    "overall": float(row[9]) if row[9] else None,
+                    "naics": float(row[10]) if row[10] else None,
+                    "setaside": float(row[11]) if row[11] else None,
+                    "keyword": float(row[12]) if row[12] else None,
+                    "size_fit": float(row[13]) if row[13] else None,
+                    "past_perf": float(row[14]) if row[14] else None,
+                }
+            opp["estimated_value"] = {
+                "low": float(row[15]) if row[15] else None,
+                "mid": float(row[16]) if row[16] else None,
+                "high": float(row[17]) if row[17] else None,
+                "confidence": row[18],
+            }
+            opps.append(opp)
+
+        return jsonify({"opportunities": opps})
+    finally:
+        cur.close()
+        release_connection(conn)
+
+
+@app.route("/api/v1/opportunities/<int:opp_id>/score")
+@login_required
+def api_opportunity_score(opp_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT overall_score, naics_score, setaside_score,
+                   keyword_score, size_fit_score, past_perf_score, scored_at
+            FROM opportunity_match_scores
+            WHERE user_id = %s AND opportunity_id = %s
+        """, (current_user.id, opp_id))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"score": None})
+        return jsonify({
+            "score": {
+                "overall": float(row[0]),
+                "naics": float(row[1]),
+                "setaside": float(row[2]),
+                "keyword": float(row[3]),
+                "size_fit": float(row[4]),
+                "past_perf": float(row[5]),
+                "scored_at": str(row[6]),
+            }
+        })
+    finally:
+        cur.close()
+        release_connection(conn)
+
+
+@app.route("/api/v1/opportunities/rescore", methods=["POST"])
+@login_required
+def api_rescore():
+    from app.services.scoring_pipeline import rescore_user_opportunities
+    t = threading.Thread(target=rescore_user_opportunities, args=(current_user.id,), daemon=True)
+    t.start()
+    return jsonify({"ok": True, "message": "Rescoring started"})
+
+
+# ── Decision / Pipeline API ──────────────────────────────────────────────────
+
+@app.route("/api/v1/opportunities/<int:opp_id>/decision", methods=["PUT"])
+@login_required
+def api_decision(opp_id):
+    data = request.get_json(silent=True) or {}
+    decision = data.get("decision")
+    if decision not in ("go", "consider", "skip"):
+        return jsonify({"error": "Invalid decision. Must be go, consider, or skip."}), 400
+
+    from app.services.auto_classifier import upsert_decision
+    upsert_decision(
+        user_id=current_user.id,
+        opportunity_id=opp_id,
+        decision=decision,
+        auto_classified=False,
+        notes=data.get("notes"),
+    )
+    return jsonify({"ok": True})
+
+
+@app.route("/api/v1/pipeline")
+@login_required
+def api_pipeline():
+    from app.services.auto_classifier import get_pipeline
+    pipeline = get_pipeline(current_user.id)
+    return jsonify(pipeline)
+
+
+@app.route("/api/v1/pipeline/stats")
+@login_required
+def api_pipeline_stats():
+    from app.services.auto_classifier import get_pipeline_stats
+    stats = get_pipeline_stats(current_user.id)
+    return jsonify(stats)
+
+
+# ── Profile Setup Page ───────────────────────────────────────────────────────
+
+@app.route("/dashboard/profile")
+@login_required
+def dashboard_profile():
+    return render_template("dashboard_profile.html")
+
+
+# ── Pipeline Dashboard Page ──────────────────────────────────────────────────
+
+@app.route("/dashboard/pipeline")
+@login_required
+def dashboard_pipeline():
+    return render_template("dashboard_pipeline.html")
 
 
 if __name__ == "__main__":

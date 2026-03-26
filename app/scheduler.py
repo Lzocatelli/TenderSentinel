@@ -62,8 +62,28 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # Nightly: recompute value statistics from historical awards
+    scheduler.add_job(
+        _recompute_statistics,
+        "cron",
+        hour=2,
+        minute=0,
+        id="nightly_statistics",
+        replace_existing=True,
+    )
+
     logger.info("Scheduler started. Waiting for jobs...")
     scheduler.start()
+
+
+def _recompute_statistics():
+    """Nightly job: recompute contract value statistics."""
+    try:
+        from app.services.value_estimator import compute_statistics_batch
+        compute_statistics_batch()
+        logger.info("Value statistics recomputed")
+    except Exception as e:
+        logger.error(f"Statistics recomputation failed: {e}")
 
 
 # Legacy aliases
