@@ -43,7 +43,7 @@ body { font-family: 'Work Sans', sans-serif; }
     <div class="max-w-5xl mx-auto">
         <div class="text-center mb-12">
             <h1 class="font-headline font-black text-4xl text-navy mb-3">Choose your plan</h1>
-            <p class="text-slate-500 font-body">Monthly subscription. Cancel anytime from the Stripe portal.</p>
+            <p class="text-slate-500 font-body">7-day free trial on all plans. Cancel anytime.</p>
             {% if cliente.plano %}
             <p class="mt-3 text-sm text-slate-400 font-label">
                 Current plan: <span class="font-bold text-navy capitalize">{{ cliente.plano }}</span>
@@ -61,27 +61,40 @@ body { font-family: 'Work Sans', sans-serif; }
                 </div>
                 {% endif %}
                 <p class="font-label font-semibold text-slate-500 text-sm uppercase tracking-widest mb-2">Basic</p>
-                <div class="mb-5">
+                <div class="mb-2">
                     <span class="font-headline font-black text-4xl text-navy">$79</span>
                     <span class="text-slate-400 text-sm font-body">/mo</span>
                 </div>
+                <p class="text-xs text-slate-400 font-label mb-5">For solo contractors getting started with federal procurement</p>
                 <ul class="space-y-3 mb-8 flex-1">
-                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
-                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
-                        5 keywords monitored
+                    <li class="flex items-start gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span><strong>5 keywords</strong> monitored daily</span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
-                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
-                        Daily email alerts
+                    <li class="flex items-start gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span>Daily email alerts with <strong>match score</strong></span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-slate-600 font-body">
-                        <span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
-                        Dashboard access
+                    <li class="flex items-start gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span>Simplified scoring (NAICS + set-aside)</span>
+                    </li>
+                    <li class="flex items-start gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span>Pipeline dashboard</span>
+                    </li>
+                    <li class="flex items-start gap-2 text-sm text-slate-600 font-body">
+                        <span class="material-symbols-outlined text-green-500 text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span>Estimated contract value range</span>
+                    </li>
+                    <li class="flex items-start gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base mt-0.5">remove</span>
+                        <span>Manual triage only (no auto-classify)</span>
                     </li>
                 </ul>
                 <a href="/assinar/basico"
                     class="block text-center py-3 rounded-xl border-2 border-navy text-navy font-headline font-bold text-sm hover:bg-navy hover:text-white transition-all">
-                    {% if cliente.plano == 'basico' %}Current plan{% else %}Subscribe{% endif %}
+                    {% if cliente.plano == 'basico' %}Current plan{% else %}Start Free Trial{% endif %}
                 </a>
             </div>
 
@@ -93,35 +106,44 @@ body { font-family: 'Work Sans', sans-serif; }
                     </span>
                 </div>
                 <p class="font-label font-semibold text-white/50 text-sm uppercase tracking-widest mb-2">Professional</p>
-                <div class="mb-5">
+                <div class="mb-2">
                     <span class="font-headline font-black text-4xl text-white">$179</span>
                     <span class="text-white/40 text-sm font-body">/mo</span>
                 </div>
+                <p class="text-xs text-white/40 font-label mb-5">Full procurement intelligence for serious GovCon competitors</p>
                 <ul class="space-y-3 mb-8 flex-1">
-                    <li class="flex items-center gap-2 text-sm text-white/80 font-body">
-                        <span class="material-symbols-outlined text-gold text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
-                        20 keywords monitored
+                    <li class="flex items-start gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span><strong>20 keywords</strong> monitored daily</span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-white/80 font-body">
-                        <span class="material-symbols-outlined text-gold text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
-                        Daily email alerts
+                    <li class="flex items-start gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span><strong>Full 5-factor match scoring</strong> (NAICS, set-aside, keywords, company size fit, past performance)</span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-white/80 font-body">
-                        <span class="material-symbols-outlined text-gold text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
-                        Weekly opportunity report
+                    <li class="flex items-start gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span><strong>Auto-classify</strong> opportunities: Go / Consider / Skip</span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-white/80 font-body">
-                        <span class="material-symbols-outlined text-gold text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
-                        Relevance score (0–10)
+                    <li class="flex items-start gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span>Estimated value with <strong>confidence level</strong></span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-white/80 font-body">
-                        <span class="material-symbols-outlined text-gold text-base" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
-                        NAICS + set-aside matching
+                    <li class="flex items-start gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span>Weekly opportunity report</span>
+                    </li>
+                    <li class="flex items-start gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span>Up to <strong>10 past performance</strong> references</span>
+                    </li>
+                    <li class="flex items-start gap-2 text-sm text-white/80 font-body">
+                        <span class="material-symbols-outlined text-gold text-base mt-0.5" style="font-variation-settings:'FILL' 1,'wght' 400">check_circle</span>
+                        <span>Company profile with <strong>50 capability keywords</strong></span>
                     </li>
                 </ul>
                 <a href="/assinar/profissional"
                     class="block text-center py-3 rounded-xl bg-gold text-white font-headline font-bold text-sm hover:bg-orange-600 transition-all">
-                    {% if cliente.plano == 'profissional' %}Current plan{% else %}Subscribe{% endif %}
+                    {% if cliente.plano == 'profissional' %}Current plan{% else %}Start Free Trial{% endif %}
                 </a>
             </div>
 
@@ -131,30 +153,35 @@ body { font-family: 'Work Sans', sans-serif; }
                     <span class="bg-slate-400 text-white text-xs font-label font-bold px-3 py-1 rounded-full">Coming Soon</span>
                 </div>
                 <p class="font-label font-semibold text-slate-400 text-sm uppercase tracking-widest mb-2">Agency</p>
-                <div class="mb-5">
+                <div class="mb-2">
                     <span class="font-headline font-black text-4xl text-slate-400">$349</span>
                     <span class="text-slate-400 text-sm font-body">/mo</span>
                 </div>
+                <p class="text-xs text-slate-400 font-label mb-5">For GovCon consultancies and teams managing multiple pursuits</p>
                 <ul class="space-y-3 mb-8 flex-1">
-                    <li class="flex items-center gap-2 text-sm text-slate-400 font-body">
-                        <span class="material-symbols-outlined text-slate-300 text-base">radio_button_unchecked</span>
-                        Unlimited keywords
+                    <li class="flex items-start gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base mt-0.5">radio_button_unchecked</span>
+                        <span>Everything in Professional</span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-slate-400 font-body">
-                        <span class="material-symbols-outlined text-slate-300 text-base">radio_button_unchecked</span>
-                        Everything in Professional
+                    <li class="flex items-start gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base mt-0.5">radio_button_unchecked</span>
+                        <span><strong>Unlimited</strong> keywords &amp; past performance</span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-slate-400 font-body">
-                        <span class="material-symbols-outlined text-slate-300 text-base">radio_button_unchecked</span>
-                        Multi-client management
+                    <li class="flex items-start gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base mt-0.5">radio_button_unchecked</span>
+                        <span><strong>Custom score weights</strong> &mdash; tune what matters most</span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-slate-400 font-body">
-                        <span class="material-symbols-outlined text-slate-300 text-base">radio_button_unchecked</span>
-                        Full history & analytics
+                    <li class="flex items-start gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base mt-0.5">radio_button_unchecked</span>
+                        <span><strong>Skip insights</strong> &mdash; profile optimization suggestions</span>
                     </li>
-                    <li class="flex items-center gap-2 text-sm text-slate-400 font-body">
-                        <span class="material-symbols-outlined text-slate-300 text-base">radio_button_unchecked</span>
-                        API access
+                    <li class="flex items-start gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base mt-0.5">radio_button_unchecked</span>
+                        <span>Pipeline CSV export &amp; weekly pipeline report</span>
+                    </li>
+                    <li class="flex items-start gap-2 text-sm text-slate-400 font-body">
+                        <span class="material-symbols-outlined text-slate-300 text-base mt-0.5">radio_button_unchecked</span>
+                        <span>Multi-user team access</span>
                     </li>
                 </ul>
                 <button disabled class="w-full py-3 bg-slate-100 text-slate-400 font-headline font-bold rounded-xl cursor-not-allowed text-sm">
@@ -164,14 +191,81 @@ body { font-family: 'Work Sans', sans-serif; }
 
         </div>
 
+        <!-- Feature comparison -->
+        <div class="mt-16 bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div class="px-7 py-5 border-b border-slate-100">
+                <h2 class="font-headline font-bold text-lg text-navy">Feature comparison</h2>
+            </div>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-slate-100">
+                        <th class="text-left px-7 py-3 font-label font-semibold text-slate-500 w-2/5">Feature</th>
+                        <th class="text-center px-4 py-3 font-label font-semibold text-slate-500">Basic</th>
+                        <th class="text-center px-4 py-3 font-label font-semibold text-navy bg-navy/5">Professional</th>
+                        <th class="text-center px-4 py-3 font-label font-semibold text-slate-400">Agency</th>
+                    </tr>
+                </thead>
+                <tbody class="font-body text-slate-600">
+                    <tr class="border-b border-slate-50">
+                        <td class="px-7 py-3">Keywords monitored</td>
+                        <td class="text-center px-4 py-3">5</td>
+                        <td class="text-center px-4 py-3 bg-navy/5 font-semibold">20</td>
+                        <td class="text-center px-4 py-3 text-slate-400">Unlimited</td>
+                    </tr>
+                    <tr class="border-b border-slate-50">
+                        <td class="px-7 py-3">Match scoring</td>
+                        <td class="text-center px-4 py-3">2-factor</td>
+                        <td class="text-center px-4 py-3 bg-navy/5 font-semibold">5-factor</td>
+                        <td class="text-center px-4 py-3 text-slate-400">5-factor + custom</td>
+                    </tr>
+                    <tr class="border-b border-slate-50">
+                        <td class="px-7 py-3">Estimated contract value</td>
+                        <td class="text-center px-4 py-3">Range</td>
+                        <td class="text-center px-4 py-3 bg-navy/5 font-semibold">Full + confidence</td>
+                        <td class="text-center px-4 py-3 text-slate-400">Full + trends</td>
+                    </tr>
+                    <tr class="border-b border-slate-50">
+                        <td class="px-7 py-3">Go / Consider / Skip</td>
+                        <td class="text-center px-4 py-3">Manual</td>
+                        <td class="text-center px-4 py-3 bg-navy/5 font-semibold">Auto-classify</td>
+                        <td class="text-center px-4 py-3 text-slate-400">Auto + insights</td>
+                    </tr>
+                    <tr class="border-b border-slate-50">
+                        <td class="px-7 py-3">Pipeline dashboard</td>
+                        <td class="text-center px-4 py-3"><span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1">check_circle</span></td>
+                        <td class="text-center px-4 py-3 bg-navy/5"><span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1">check_circle</span></td>
+                        <td class="text-center px-4 py-3"><span class="material-symbols-outlined text-slate-300 text-base" style="font-variation-settings:'FILL' 1">check_circle</span></td>
+                    </tr>
+                    <tr class="border-b border-slate-50">
+                        <td class="px-7 py-3">Past performance tracking</td>
+                        <td class="text-center px-4 py-3"><span class="material-symbols-outlined text-slate-300 text-base">close</span></td>
+                        <td class="text-center px-4 py-3 bg-navy/5 font-semibold">10 contracts</td>
+                        <td class="text-center px-4 py-3 text-slate-400">Unlimited</td>
+                    </tr>
+                    <tr class="border-b border-slate-50">
+                        <td class="px-7 py-3">Weekly opportunity report</td>
+                        <td class="text-center px-4 py-3"><span class="material-symbols-outlined text-slate-300 text-base">close</span></td>
+                        <td class="text-center px-4 py-3 bg-navy/5"><span class="material-symbols-outlined text-green-500 text-base" style="font-variation-settings:'FILL' 1">check_circle</span></td>
+                        <td class="text-center px-4 py-3"><span class="material-symbols-outlined text-slate-300 text-base" style="font-variation-settings:'FILL' 1">check_circle</span></td>
+                    </tr>
+                    <tr>
+                        <td class="px-7 py-3">Profile capability keywords</td>
+                        <td class="text-center px-4 py-3">10</td>
+                        <td class="text-center px-4 py-3 bg-navy/5 font-semibold">50</td>
+                        <td class="text-center px-4 py-3 text-slate-400">Unlimited</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
         <p class="text-center mt-8 text-xs text-slate-400 font-label">
-            Secure payment via Stripe. You'll be redirected to checkout to complete your subscription.
+            Secure payment via Stripe. All plans include a 7-day free trial.
         </p>
     </div>
 </div>
 
 <footer class="text-center py-6 text-xs text-slate-400 font-label">
-    © 2026 TenderSentinel — Smart Federal Contract Monitor
+    &copy; 2026 TenderSentinel &mdash; Smart Federal Contract Monitor
 </footer>
 </body>
 </html>

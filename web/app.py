@@ -28,7 +28,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from app.alertas import send_email
 from app.config import (BASE_URL, DASHBOARD_LIMIT, CSV_EXPORT_LIMIT,
                         COUNTER_CACHE_TTL_MINUTES, TRIAL_PERIOD_DAYS,
-                        VALID_SET_ASIDES, PLAN_LIMITS, FREE_KEYWORD_LIMIT)
+                        VALID_SET_ASIDES, PLAN_LIMITS, FREE_KEYWORD_LIMIT,
+                        get_plan_features)
 from app.database import get_connection, release_connection
 from app.score import calcular_score
 from app.utils import format_currency, keyword_limit
@@ -1276,6 +1277,11 @@ def api_profile_keywords():
 @app.route("/api/v1/profile/past-performance", methods=["POST"])
 @login_required
 def api_profile_past_perf():
+    features = get_plan_features(current_user.plano)
+    pp_limit = features.get("past_performance_limit", 0)
+    if pp_limit == 0:
+        return jsonify({"error": "Past performance tracking requires Professional plan", "upgrade": True}), 403
+
     data = request.get_json(silent=True) or {}
 
     conn = get_connection()
@@ -1393,16 +1399,24 @@ def api_opportunity_score(opp_id):
         row = cur.fetchone()
         if not row:
             return jsonify({"score": None})
+
+        features = get_plan_features(current_user.plano)
+        score_data = {
+            "overall": float(row[0]),
+            "naics": float(row[1]),
+            "setaside": float(row[2]),
+            "scored_at": str(row[6]),
+        }
+        # Full breakdown only for Professional+
+        if features["score_factors"] >= 5:
+            score_data["keyword"] = float(row[3])
+            score_data["size_fit"] = float(row[4])
+            score_data["past_perf"] = float(row[5])
+        else:
+            score_data["upgrade_hint"] = "Upgrade to Professional for full 5-factor scoring"
+
         return jsonify({
-            "score": {
-                "overall": float(row[0]),
-                "naics": float(row[1]),
-                "setaside": float(row[2]),
-                "keyword": float(row[3]),
-                "size_fit": float(row[4]),
-                "past_perf": float(row[5]),
-                "scored_at": str(row[6]),
-            }
+            "score": score_data
         })
     finally:
         cur.close()
@@ -1442,6 +1456,9 @@ def api_decision(opp_id):
 @app.route("/api/v1/pipeline")
 @login_required
 def api_pipeline():
+    features = get_plan_features(current_user.plano)
+    if not features.get("pipeline_dashboard"):
+        return jsonify({"error": "Pipeline dashboard requires Basic plan or higher", "upgrade": True}), 403
     from app.services.auto_classifier import get_pipeline
     pipeline = get_pipeline(current_user.id)
     return jsonify(pipeline)
@@ -1450,6 +1467,9 @@ def api_pipeline():
 @app.route("/api/v1/pipeline/stats")
 @login_required
 def api_pipeline_stats():
+    features = get_plan_features(current_user.plano)
+    if not features.get("pipeline_dashboard"):
+        return jsonify({"error": "Pipeline stats require Basic plan or higher", "upgrade": True}), 403
     from app.services.auto_classifier import get_pipeline_stats
     stats = get_pipeline_stats(current_user.id)
     return jsonify(stats)

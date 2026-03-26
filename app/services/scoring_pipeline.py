@@ -3,6 +3,7 @@ Scoring pipeline — orchestrates match scoring, value estimation, and auto-clas
 """
 import logging
 
+from app.config import get_plan_features
 from app.database import get_connection, release_connection
 from app.services.match_scorer import MatchScorer
 from app.services.value_estimator import ContractValueEstimator
@@ -164,22 +165,24 @@ def score_opportunity_for_all_users(opportunity_id: int):
 
         opp = _opp_row_to_dict(row)
 
-        cur.execute("SELECT id FROM clientes WHERE ativo = TRUE")
+        cur.execute("SELECT id, plano FROM clientes WHERE ativo = TRUE")
         users = cur.fetchall()
     finally:
         cur.close()
         release_connection(conn)
 
-    for (uid,) in users:
+    for uid, plano in users:
         profile = build_profile_dict(uid)
         if not profile:
             continue
         breakdown = _scorer.score(opp, profile)
         upsert_match_score(uid, opportunity_id, breakdown)
 
-        # Auto-classify
-        decision = _classifier.classify(breakdown.overall)
-        upsert_decision(uid, opportunity_id, decision, auto_classified=True)
+        # Auto-classify only for plans that support it
+        features = get_plan_features(plano)
+        if features.get("auto_classify"):
+            decision = _classifier.classify(breakdown.overall)
+            upsert_decision(uid, opportunity_id, decision, auto_classified=True)
 
 
 def rescore_user_opportunities(user_id: int):
@@ -196,16 +199,25 @@ def rescore_user_opportunities(user_id: int):
             "FROM licitacoes WHERE deadline >= CURRENT_DATE OR deadline IS NULL"
         )
         rows = cur.fetchall()
+
+        # Get user plan for feature gating
+        cur.execute("SELECT plano FROM clientes WHERE id = %s", (user_id,))
+        plano_row = cur.fetchone()
+        plano = plano_row[0] if plano_row else None
     finally:
         cur.close()
         release_connection(conn)
+
+    features = get_plan_features(plano)
 
     for row in rows:
         opp = _opp_row_to_dict(row)
         breakdown = _scorer.score(opp, profile)
         upsert_match_score(user_id, opp["id"], breakdown)
-        decision = _classifier.classify(breakdown.overall)
-        upsert_decision(user_id, opp["id"], decision, auto_classified=True)
+
+        if features.get("auto_classify"):
+            decision = _classifier.classify(breakdown.overall)
+            upsert_decision(user_id, opp["id"], decision, auto_classified=True)
 
     logger.info(f"Rescored {len(rows)} opportunities for user {user_id}")
 
