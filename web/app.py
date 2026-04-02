@@ -702,7 +702,7 @@ def subscribe(plan):
     return redirect(checkout_session.url, code=303)
 
 # Legacy route alias
-app.add_url_rule("/assinar/<plano>", endpoint="assinar", view_func=subscribe)
+app.add_url_rule("/assinar/<plan>", endpoint="assinar", view_func=subscribe)
 
 
 @app.route("/manage-subscription")
@@ -965,7 +965,8 @@ app.add_url_rule("/newsletter/descadastro/<token>", endpoint="newsletter_descada
 
 @app.route("/planos")
 def planos():
-    return render_template("planos.html")
+    cliente = current_user if current_user.is_authenticated else None
+    return render_template("planos.html", cliente=cliente)
 
 
 # ── Blog ─────────────────────────────────────────────────────────────────────

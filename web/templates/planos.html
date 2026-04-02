@@ -33,7 +33,7 @@ body { font-family: 'Work Sans', sans-serif; }
         <a href="/" class="font-headline font-black text-xl text-white tracking-tight">Tender<span class="text-gold">Sentinel</span></a>
         <div class="flex items-center gap-5">
             <a href="/dashboard" class="text-sm text-white/70 hover:text-white transition-colors font-label">Dashboard</a>
-            <span class="text-white/60 text-sm font-label">{{ cliente.nome }}</span>
+            {% if cliente %}<span class="text-white/60 text-sm font-label">{{ cliente.nome }}</span>{% endif %}
             <a href="/logout" class="text-sm text-white/70 hover:text-white transition-colors font-label">Sign out</a>
         </div>
     </div>
