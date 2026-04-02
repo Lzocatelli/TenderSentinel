@@ -100,7 +100,7 @@ login_manager.login_view = "login"
 
 
 class Client(UserMixin):
-    def __init__(self, id, name, email, keywords, plan=None, naics_codes=None, set_asides=None):
+    def __init__(self, id, name, email, keywords, plan=None, naics_codes=None, set_asides=None, trial_used=False):
         self.id = id
         self.name = name
         self.email = email
@@ -108,6 +108,7 @@ class Client(UserMixin):
         self.plan = plan
         self.naics_codes = naics_codes or []
         self.set_asides = set_asides or []
+        self.trial_used = trial_used or False
 
     @property
     def keyword_limit(self):
@@ -144,7 +145,7 @@ def load_user(user_id):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, nome, email, palavras_chave, plano, naics_codes, set_asides FROM clientes WHERE id = %s",
+        "SELECT id, nome, email, palavras_chave, plano, naics_codes, set_asides, trial_used FROM clientes WHERE id = %s",
         (user_id,),
     )
     row = cur.fetchone()
@@ -688,6 +689,7 @@ def subscribe(plan):
     release_connection(conn)
     customer_id = row[0] if row and row[0] else None
 
+    subscription_data = {} if current_user.trial_used else {"trial_period_days": TRIAL_PERIOD_DAYS}
     checkout_session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         mode="subscription",
@@ -695,7 +697,7 @@ def subscribe(plan):
         customer=customer_id,
         customer_email=None if customer_id else current_user.email,
         metadata={"cliente_id": current_user.id},
-        subscription_data={"trial_period_days": TRIAL_PERIOD_DAYS},
+        subscription_data=subscription_data,
         success_url=request.host_url + "payment/success",
         cancel_url=request.host_url + "payment/cancelled",
     )
@@ -816,7 +818,7 @@ def webhook_stripe():
             pass
 
         cur.execute(
-            "UPDATE clientes SET plano=%s, stripe_customer_id=%s, stripe_subscription_id=%s, stripe_last_session_id=%s WHERE id=%s",
+            "UPDATE clientes SET plano=%s, stripe_customer_id=%s, stripe_subscription_id=%s, stripe_last_session_id=%s, trial_used=TRUE WHERE id=%s",
             (plan, customer_id, subscription_id, session_id, client_id),
         )
 

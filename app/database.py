@@ -178,6 +178,13 @@ def create_tables():
         logger.warning(f"Newsletter confirmed column migration failed: {e}")
         conn.rollback()
 
+    # ── Trial used tracking ───────────────────────────────────────────────────
+    try:
+        cur.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS trial_used BOOLEAN DEFAULT FALSE;")
+    except Exception as e:
+        logger.warning(f"trial_used column migration failed: {e}")
+        conn.rollback()
+
     # ── Feature 1: Company profiles & match scores ─────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS company_profiles (
