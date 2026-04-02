@@ -209,7 +209,7 @@ def count_opportunities_today():
     try:
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM licitacoes WHERE data_publicacao = CURRENT_DATE")
+        cur.execute("SELECT COUNT(*) FROM licitacoes WHERE deadline >= CURRENT_DATE OR deadline IS NULL")
         total = cur.fetchone()[0] or 0
         cur.close()
         release_connection(conn)
