@@ -44,18 +44,25 @@ logger = logging.getLogger("tendersentinel.web")
 secret_key = os.getenv("SECRET_KEY")
 if not secret_key:
     secret_key = secrets.token_urlsafe(32)
-    if os.getenv("FLASK_ENV") != "production":
-        logger.warning(
-            "SECRET_KEY not set; using temporary key. "
-            "Set SECRET_KEY in environment for production."
-        )
+    # Warn in every environment, not just non-production: with multiple
+    # gunicorn workers each process generates its own random key, so signed
+    # session cookies from one worker fail to decode on another — breaking
+    # login persistence and the OAuth CSRF `state` used by /auth/google.
+    logger.warning(
+        "SECRET_KEY not set; using a temporary per-process key. "
+        "Set SECRET_KEY in the environment, especially in production "
+        "with multiple workers, or sessions/OAuth will break intermittently."
+    )
 
 app = Flask(__name__)
 app.secret_key = secret_key
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
-    SESSION_COOKIE_SAMESITE="Strict",
+    # Lax (not Strict): Strict drops the session cookie on the top-level GET
+    # redirect Google sends back to /auth/google/callback, which loses the
+    # OAuth CSRF `state` and makes every Google sign-in fail.
+    SESSION_COOKIE_SAMESITE="Lax",
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
 
