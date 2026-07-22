@@ -634,11 +634,20 @@ def search_now():
                     </div>
                     </div>
                     """
-                    send_email(cemail, f"TenderSentinel — {count} new {plural} found!", body)
-                    cur.executemany(
-                        "INSERT INTO alertas_enviados (cliente_id, licitacao_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                        [(cid, m[0]) for m in new_matches],
-                    )
+                    sent = send_email(cemail, f"TenderSentinel — {count} new {plural} found!", body)
+                    if sent:
+                        cur.executemany(
+                            "INSERT INTO alertas_enviados (cliente_id, licitacao_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                            [(cid, m[0]) for m in new_matches],
+                        )
+                        logger.info(f"Manual search: sent {count} {plural} to {cemail}")
+                    else:
+                        logger.error(
+                            f"Manual search: found {count} {plural} for {cemail} but send_email failed — "
+                            "not marking as sent, will retry next search"
+                        )
+                else:
+                    logger.info(f"Manual search: no new matches for {cemail}")
 
                 conn.commit()
             except Exception as e:
