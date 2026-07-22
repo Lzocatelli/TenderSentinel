@@ -31,7 +31,7 @@ from app.config import (BASE_URL, DASHBOARD_LIMIT, CSV_EXPORT_LIMIT,
                         COUNTER_CACHE_TTL_MINUTES, TRIAL_PERIOD_DAYS,
                         VALID_SET_ASIDES, PLAN_LIMITS, FREE_KEYWORD_LIMIT,
                         EMAIL_BANNER, ai_summary_enabled, get_plan_features)
-from app.database import get_connection, release_connection
+from app.database import create_tables, get_connection, release_connection
 from app.score import calculate_score
 from app.utils import format_currency, keyword_limit
 
@@ -91,6 +91,16 @@ if os.getenv("FLASK_ENV") == "production":
     _missing_env = [v for v in _required_env if not os.getenv(v)]
     if _missing_env:
         logger.error(f"Missing required environment variables: {', '.join(_missing_env)}")
+
+# ── Schema migrations ────────────────────────────────────────────────────────
+# Runs on every boot (each gunicorn worker included) so new columns/tables
+# land in the database automatically on deploy — nothing here creates or
+# alters anything that isn't already guarded with IF NOT EXISTS in
+# create_tables(), so repeated/concurrent runs across workers are safe.
+try:
+    create_tables()
+except Exception:
+    logger.error("Database schema migration failed at startup", exc_info=True)
 
 # ── Rate Limiter (Q6, Q42) ──────────────────────────────────────────────────
 
