@@ -42,6 +42,7 @@ PLAN_FEATURES = {
         "pipeline_dashboard": False,
         "past_performance_limit": 0,
         "profile_keywords_limit": 5,
+        "ai_summary": False,
     },
     "basic": {
         "score_factors": 2,
@@ -50,6 +51,7 @@ PLAN_FEATURES = {
         "pipeline_dashboard": True,
         "past_performance_limit": 0,
         "profile_keywords_limit": 10,
+        "ai_summary": False,
     },
     "basico": None,  # alias → resolved at runtime
     "professional": {
@@ -59,6 +61,7 @@ PLAN_FEATURES = {
         "pipeline_dashboard": True,
         "past_performance_limit": 10,
         "profile_keywords_limit": 50,
+        "ai_summary": True,
     },
     "profissional": None,  # alias → resolved at runtime
     "agency": {
@@ -71,6 +74,7 @@ PLAN_FEATURES = {
         "custom_weights": True,
         "pipeline_export": True,
         "skip_insights": True,
+        "ai_summary": True,
     },
     "agencia": None,  # alias → resolved at runtime
 }
@@ -92,6 +96,12 @@ DASHBOARD_LIMIT = 50
 CSV_EXPORT_LIMIT = 500
 COUNTER_CACHE_TTL_MINUTES = 5
 
+# ── AI Summaries (optional — disabled if ANTHROPIC_API_KEY is unset) ────────
+
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+AI_SUMMARY_MODEL = os.getenv("AI_SUMMARY_MODEL", "claude-haiku-4-5-20251001")
+ai_summary_enabled = bool(ANTHROPIC_API_KEY)
+
 # ── Stripe ───────────────────────────────────────────────────────────────────
 
 TRIAL_PERIOD_DAYS = 7
@@ -103,11 +113,11 @@ VALID_SET_ASIDES = {"SBA", "8A", "HZC", "WOSB", "EDWOSB", "SDVOSB", "VSB"}
 # ── Email banner (shared by alertas and relatorio) ───────────────────────────
 
 EMAIL_BANNER = """
-<div style="background:linear-gradient(135deg,#0f1f3d 0%,#1a3a6b 100%);padding:28px 32px;text-align:center;border-radius:12px 12px 0 0">
-    <div style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;font-family:Georgia,serif">
-        Tender<span style="color:#d4af37">Sentinel</span>
+<div style="background:linear-gradient(135deg,#131b2e 0%,#1c2b47 100%);padding:28px 32px;text-align:center;border-radius:12px 12px 0 0">
+    <div style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif">
+        Tender<span style="color:#fc7218">Sentinel</span>
     </div>
-    <div style="font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-top:5px">
+    <div style="font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-top:5px;font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif">
         Smart Federal Contract Monitor
     </div>
 </div>

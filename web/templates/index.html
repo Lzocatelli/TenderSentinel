@@ -142,7 +142,7 @@
         <a href="/logout" class="px-5 py-2 text-sm font-bold font-headline bg-primary text-white rounded-md">Sign out</a>
         {% else %}
         <a href="/login" class="px-4 py-2 text-sm font-bold font-headline text-slate-950 hover:bg-slate-100 rounded-md transition-all">Login</a>
-        <a href="/cadastro" class="px-5 py-2 text-sm font-bold font-headline bg-primary text-white rounded-md active:scale-95 duration-150">Get Started</a>
+        <a href="/signup" class="px-5 py-2 text-sm font-bold font-headline bg-primary text-white rounded-md active:scale-95 duration-150">Get Started</a>
         {% endif %}
     </div>
 </div>
@@ -163,7 +163,7 @@
             TenderSentinel monitors SAM.gov in real-time and sends personalized alerts scored by NAICS match, set-aside eligibility, and contract value. Never miss a high-value opportunity again.
         </p>
         <div class="reveal reveal-delay-3 flex flex-col sm:flex-row gap-4">
-            <a href="/cadastro" class="px-8 py-4 bg-secondary text-white font-headline font-bold rounded-lg text-lg flex items-center justify-center gap-2 shadow-xl shadow-secondary/20">
+            <a href="/signup" class="px-8 py-4 bg-secondary text-white font-headline font-bold rounded-lg text-lg flex items-center justify-center gap-2 shadow-xl shadow-secondary/20">
                 Get Started <span class="material-symbols-outlined text-xl">arrow_forward</span>
             </a>
             <a href="#planos" class="px-8 py-4 bg-white/10 backdrop-blur-md text-white border border-white/20 font-headline font-bold rounded-lg text-lg hover:bg-white/20 transition-all text-center">
@@ -335,7 +335,7 @@
             </span>
         </div>
     </div>
-    <div id="pricing-grid" class="grid grid-cols-1 md:grid-cols-3 gap-8" data-periodo="mensal">
+    <div id="pricing-grid" class="grid grid-cols-1 md:grid-cols-3 gap-8" data-period="monthly">
         <!-- Basic -->
         <div class="bg-surface-container-low rounded-xl p-8 border border-transparent hover:border-outline-variant/30 transition-all reveal reveal-delay-1">
             <div class="font-label text-xs uppercase font-bold text-on-surface-variant mb-2">Basic</div>
@@ -351,7 +351,7 @@
                 <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>Opportunity score (0–10)</li>
                 <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-primary text-lg">check</span>NAICS + set-aside matching</li>
             </ul>
-            <button onclick="assinar('basico')" class="w-full py-3 bg-white border border-outline-variant text-primary font-headline font-bold rounded hover:bg-surface-container-high transition-colors">Start Free Trial</button>
+            <button onclick="subscribe('basico')" class="w-full py-3 bg-white border border-outline-variant text-primary font-headline font-bold rounded hover:bg-surface-container-high transition-colors">Start Free Trial</button>
         </div>
         <!-- Professional -->
         <div class="bg-primary text-white rounded-xl p-8 shadow-2xl relative overflow-hidden transform scale-105 z-10 reveal reveal-delay-2">
@@ -371,7 +371,7 @@
                 <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-secondary-container text-lg">check</span>Manual search on demand</li>
                 <li class="flex items-start gap-3 text-sm"><span class="material-symbols-outlined text-secondary-container text-lg">check</span>CSV export</li>
             </ul>
-            <button onclick="assinar('profissional')" class="w-full py-3 bg-secondary text-white font-headline font-bold rounded shadow-lg hover:bg-secondary-container transition-colors">Start Free Trial</button>
+            <button onclick="subscribe('profissional')" class="w-full py-3 bg-secondary text-white font-headline font-bold rounded shadow-lg hover:bg-secondary-container transition-colors">Start Free Trial</button>
         </div>
         <!-- Agency -->
         <div class="bg-surface-container-low rounded-xl p-8 border border-outline-variant/20 transition-all reveal reveal-delay-3 relative opacity-80">
@@ -481,7 +481,7 @@
 <div class="max-w-4xl mx-auto px-6 text-center">
     <h2 class="font-headline text-4xl md:text-5xl font-black mb-6 tracking-tighter reveal">Weekly Contract Digest — <span class="text-secondary-container">free</span></h2>
     <p class="text-on-primary-container text-lg mb-10 reveal reveal-delay-1">Every Monday at 9am, the best federal opportunities of the week delivered to your inbox.</p>
-    <form method="POST" action="/newsletter/cadastro" class="reveal reveal-delay-2 flex flex-col sm:flex-row gap-4 justify-center max-w-xl mx-auto">
+    <form method="POST" action="/newsletter/signup" class="reveal reveal-delay-2 flex flex-col sm:flex-row gap-4 justify-center max-w-xl mx-auto">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="text" name="nome" placeholder="Your name" required
             class="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-secondary-container font-body">
@@ -510,9 +510,9 @@
     <div>
         <h4 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-white/40">Account</h4>
         <ul class="space-y-4 font-body text-sm font-light">
-            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/cadastro">Create Account</a></li>
+            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/signup">Create Account</a></li>
             <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/login">Sign In</a></li>
-            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/minha-conta">My Account</a></li>
+            <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/my-account">My Account</a></li>
         </ul>
     </div>
     <div>
@@ -594,7 +594,7 @@ function toggleBilling() {
         labelAnual.classList.replace('font-medium', 'font-semibold');
         labelMensal.classList.replace('text-on-surface', 'text-on-surface-variant');
         labelMensal.classList.replace('font-semibold', 'font-medium');
-        grid.dataset.periodo = 'anual';
+        grid.dataset.period = 'annual';
     } else {
         btn.classList.replace('bg-secondary', 'bg-outline-variant');
         btn.setAttribute('aria-pressed', 'false');
@@ -604,7 +604,7 @@ function toggleBilling() {
         labelMensal.classList.replace('font-medium', 'font-semibold');
         labelAnual.classList.replace('text-on-surface', 'text-on-surface-variant');
         labelAnual.classList.replace('font-semibold', 'font-medium');
-        grid.dataset.periodo = 'mensal';
+        grid.dataset.period = 'monthly';
     }
 
     // Update displayed prices
@@ -617,12 +617,12 @@ function toggleBilling() {
 }
 
 // Plan subscription
-function assinar(plano) {
-    const periodo = document.getElementById('pricing-grid')?.dataset.periodo || 'mensal';
+function subscribe(plan) {
+    const period = document.getElementById('pricing-grid')?.dataset.period || 'monthly';
 {% if current_user.is_authenticated %}
-    window.location.href = `/assinar/${plano}?periodo=${periodo}`;
+    window.location.href = `/subscribe/${plan}?period=${period}`;
 {% else %}
-    window.location.href = `/cadastro`;
+    window.location.href = `/signup`;
 {% endif %}
 }
 

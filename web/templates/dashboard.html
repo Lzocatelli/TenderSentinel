@@ -76,7 +76,7 @@ tailwind.config = {
     <a href="/" class="text-xl font-black tracking-tighter text-slate-950 font-headline">TenderSentinel</a>
     <div class="flex items-center gap-4">
         <span class="hidden sm:block font-label text-xs text-on-surface-variant">{{ cliente.nome }}</span>
-        <a href="/minha-conta" class="text-sm font-body text-on-surface-variant hover:text-on-surface transition-colors">Account</a>
+        <a href="/my-account" class="text-sm font-body text-on-surface-variant hover:text-on-surface transition-colors">Account</a>
         <a href="/logout" class="px-4 py-2 text-sm font-bold font-headline bg-primary text-white rounded-md">Sign out</a>
     </div>
 </div>
@@ -94,7 +94,7 @@ tailwind.config = {
         <p class="text-on-surface-variant font-body text-sm mt-1">
             Plan: <strong class="text-on-surface capitalize">{{ cliente.plano or 'Free' }}</strong>
             · {{ cliente.limite_palavras if cliente.limite_palavras else '∞' }} keywords
-            · <a href="/gerenciar-assinatura" class="text-secondary hover:underline">Manage subscription</a>
+            · <a href="/manage-subscription" class="text-secondary hover:underline">Manage subscription</a>
         </p>
     </div>
 
@@ -122,8 +122,8 @@ tailwind.config = {
             <span class="bg-green-50 text-green-700 font-label text-xs font-bold px-3 py-1 rounded-full">{{ sa }}</span>
         {% endfor %}
         <div class="ml-auto flex gap-3">
-            <a href="/editar-palavras" class="font-label text-xs font-bold text-secondary hover:underline">Edit keywords</a>
-            <a href="/editar-perfil" class="font-label text-xs font-bold text-secondary hover:underline">Edit profile</a>
+            <a href="/edit-keywords" class="font-label text-xs font-bold text-secondary hover:underline">Edit keywords</a>
+            <a href="/edit-profile" class="font-label text-xs font-bold text-secondary hover:underline">Edit profile</a>
         </div>
     </div>
 
@@ -161,7 +161,7 @@ tailwind.config = {
             </div>
             <div class="flex items-center gap-3 flex-wrap">
                 {% if cliente.plano_pago %}
-                <form method="POST" action="/buscar-agora">
+                <form method="POST" action="/search-now">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="px-4 py-2 bg-secondary text-white font-headline font-bold text-sm rounded-lg hover:bg-secondary-container transition-colors border-0 cursor-pointer">
                         <span class="material-symbols-outlined text-base mr-1">search</span>Search now
@@ -235,14 +235,29 @@ tailwind.config = {
                         <span class="font-label text-xs text-on-surface-variant">{{ l[3] or '—' }}</span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        {% if l[4] %}
-                        <a href="{{ l[4] }}" target="_blank"
-                           class="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-white font-label text-xs font-bold rounded-lg hover:opacity-80 transition-opacity">
-                            View <span class="material-symbols-outlined text-sm">open_in_new</span>
-                        </a>
-                        {% endif %}
+                        <div class="flex items-center gap-2">
+                            {% if l[4] %}
+                            <a href="{{ l[4] }}" target="_blank"
+                               class="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-white font-label text-xs font-bold rounded-lg hover:opacity-80 transition-opacity">
+                                View <span class="material-symbols-outlined text-sm">open_in_new</span>
+                            </a>
+                            {% endif %}
+                            {% if ai_summary_enabled and cliente.plano in ('profissional', 'agencia') %}
+                            <button type="button" onclick="toggleSummary({{ l[-1] }})"
+                                class="ai-summary-toggle inline-flex items-center gap-1 px-3 py-1.5 border border-secondary-container text-secondary font-label text-xs font-bold rounded-lg hover:bg-secondary/10 transition-colors">
+                                <span class="material-symbols-outlined text-sm">auto_awesome</span> AI Summary
+                            </button>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
+                {% if ai_summary_enabled and cliente.plano in ('profissional', 'agencia') %}
+                <tr id="summary-row-{{ l[-1] }}" class="hidden border-t border-outline-variant/10 bg-surface-container-low">
+                    <td colspan="{{ 6 if show_score else 5 }}" class="px-6 py-5">
+                        <div id="summary-content-{{ l[-1] }}"></div>
+                    </td>
+                </tr>
+                {% endif %}
                 {% endfor %}
             </tbody>
         </table>
@@ -261,6 +276,90 @@ tailwind.config = {
 <footer class="border-t border-outline-variant/10 py-6 text-center">
     <p class="font-label text-xs text-on-surface-variant">© 2026 TenderSentinel — Smart Federal Contract Monitor</p>
 </footer>
+
+<script>
+const _summaryCache = {};
+
+async function toggleSummary(oppId) {
+    const row = document.getElementById(`summary-row-${oppId}`);
+    const content = document.getElementById(`summary-content-${oppId}`);
+    const btn = document.querySelector(`.ai-summary-toggle[onclick="toggleSummary(${oppId})"]`);
+
+    const isHidden = row.classList.contains('hidden');
+    if (!isHidden) {
+        row.classList.add('hidden');
+        return;
+    }
+    row.classList.remove('hidden');
+
+    if (_summaryCache[oppId]) {
+        content.innerHTML = _summaryCache[oppId];
+        return;
+    }
+
+    content.innerHTML = `
+        <div class="flex items-center gap-2 text-on-surface-variant font-body text-sm">
+            <span class="material-symbols-outlined animate-spin text-base">progress_activity</span>
+            Generating AI summary…
+        </div>`;
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch(`/api/v1/opportunities/${oppId}/summary`, {
+            headers: { 'X-CSRF-Token': '{{ csrf_token() }}' },
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            content.innerHTML = `<p class="font-body text-sm text-red-600">${data.error || 'Could not load summary.'}</p>`;
+            return;
+        }
+
+        const s = data.summary;
+        const list = (items, icon) => (items && items.length)
+            ? `<ul class="space-y-1">${items.map(i => `
+                <li class="flex items-start gap-2 text-sm font-body text-on-surface">
+                    <span class="material-symbols-outlined text-sm text-secondary-container mt-0.5">${icon}</span>${i}
+                </li>`).join('')}</ul>`
+            : `<p class="text-xs text-on-surface-variant font-body">None noted</p>`;
+
+        const html = `
+            <div class="grid md:grid-cols-2 gap-5">
+                <div class="md:col-span-2">
+                    <p class="font-label text-xs uppercase tracking-wider text-secondary font-bold mb-1.5">Summary</p>
+                    <p class="font-body text-sm text-on-surface leading-relaxed">${s.summary}</p>
+                </div>
+                <div>
+                    <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-1.5">Key requirements</p>
+                    ${list(s.key_requirements, 'check_circle')}
+                </div>
+                <div>
+                    <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-1.5">Documents needed</p>
+                    ${list(s.documents_needed, 'description')}
+                </div>
+                <div>
+                    <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-1.5">Important dates</p>
+                    ${list(s.important_dates, 'event')}
+                </div>
+                <div>
+                    <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-1.5">Risk flags</p>
+                    ${list(s.risk_flags, 'warning')}
+                </div>
+            </div>
+            <p class="text-[10px] text-on-surface-variant font-label mt-4">
+                AI-generated — verify details against the official listing before bidding.
+                ${s.cached ? 'Cached result.' : 'Freshly generated.'}
+            </p>`;
+
+        _summaryCache[oppId] = html;
+        content.innerHTML = html;
+    } catch (err) {
+        content.innerHTML = `<p class="font-body text-sm text-red-600">Network error — please try again.</p>`;
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+</script>
 
 </body>
 </html>

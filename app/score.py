@@ -85,23 +85,23 @@ def _set_aside_score(opportunity_set_aside: Optional[str], user_set_asides: List
     return 1.0 if opp_sa in user_sa else 0.0
 
 
-def _value_bonus(valor: Optional[float]) -> float:
+def _value_bonus(value: Optional[float]) -> float:
     """
     Logarithmic value bonus (0–1).
     $10k = +0.3, $100k = +0.6, $1M = +0.9, $10M+ = +1.0
     """
-    if not valor or valor <= 0:
+    if not value or value <= 0:
         return 0.0
     try:
-        return min(math.log10(valor / 10_000 + 1) * 0.5, 1.0)
+        return min(math.log10(value / 10_000 + 1) * 0.5, 1.0)
     except Exception:
         return 0.0
 
 
-def calcular_score(
-    objeto: str,
-    palavras_chave: List[str],
-    valor: float = None,
+def calculate_score(
+    title: str,
+    keywords: List[str],
+    value: float = None,
     naics_code: str = None,
     user_naics: List[str] = None,
     set_aside: str = None,
@@ -117,9 +117,13 @@ def calcular_score(
     - Value bonus:     0–1 pt (log scale, USD)
     """
     score = 0.0
-    score += _keyword_score(objeto, palavras_chave or [])
+    score += _keyword_score(title, keywords or [])
     score += _naics_score(naics_code, user_naics or [])
     score += _set_aside_score(set_aside, user_set_asides or [])
-    score += _value_bonus(valor)
+    score += _value_bonus(value)
 
     return max(0, min(10, round(score)))
+
+
+# Legacy alias for backwards compat
+calcular_score = calculate_score

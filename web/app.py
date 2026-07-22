@@ -15,6 +15,7 @@ import frontmatter
 import markdown as md_lib
 import requests
 import stripe
+from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from flask import (Flask, Response, abort, flash, jsonify, redirect,
                    render_template, request, session, url_for)
@@ -29,9 +30,9 @@ from app.alertas import send_email
 from app.config import (BASE_URL, DASHBOARD_LIMIT, CSV_EXPORT_LIMIT,
                         COUNTER_CACHE_TTL_MINUTES, TRIAL_PERIOD_DAYS,
                         VALID_SET_ASIDES, PLAN_LIMITS, FREE_KEYWORD_LIMIT,
-                        get_plan_features)
+                        EMAIL_BANNER, ai_summary_enabled, get_plan_features)
 from app.database import get_connection, release_connection
-from app.score import calcular_score
+from app.score import calculate_score
 from app.utils import format_currency, keyword_limit
 
 load_dotenv(override=False)
@@ -61,7 +62,8 @@ app.config.update(
 # Template globals
 @app.context_processor
 def inject_now():
-    return {"now": datetime.now()}
+    return {"now": datetime.now(), "google_oauth_enabled": google_oauth_enabled,
+             "ai_summary_enabled": ai_summary_enabled}
 
 # HTTPS redirect for production (Q10)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
@@ -97,6 +99,30 @@ limiter = Limiter(
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
+
+# ── Google OAuth ─────────────────────────────────────────────────────────────
+# Optional: only registered if credentials are present in the environment.
+# Create a Web Application OAuth client at https://console.cloud.google.com/apis/credentials
+# and set the authorized redirect URI to {BASE_URL}/auth/google/callback.
+
+oauth = OAuth(app)
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+google_oauth_enabled = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+
+if google_oauth_enabled:
+    oauth.register(
+        name="google",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
+else:
+    logger.warning(
+        "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set — "
+        "'Continue with Google' will be hidden and /auth/google will 404."
+    )
 
 
 class Client(UserMixin):
@@ -260,6 +286,16 @@ def health():
         return jsonify({"status": "error", "database": "unavailable"}), 503
 
 
+def _legacy_redirect(endpoint):
+    """Permanent redirect from an old pt-BR URL to its English canonical route.
+    Keeps any already-indexed/bookmarked links working while consolidating
+    SEO authority on the English URL (the app targets the US market)."""
+    def _view(**kwargs):
+        return redirect(url_for(endpoint, **kwargs), code=301)
+    _view.__name__ = f"redirect_to_{endpoint}"
+    return _view
+
+
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -308,11 +344,13 @@ def signup():
         release_connection(conn)
 
         send_email(email, "Welcome to TenderSentinel!", f"""
-        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-            <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
-            <h2>Welcome, {html_lib.escape(name)}!</h2>
+        <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px 16px">
+        {EMAIL_BANNER}
+        <div style="background:#ffffff;padding:28px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-radius:0 0 12px 12px">
+            <h2 style="color:#131b2e">Welcome, {html_lib.escape(name)}!</h2>
             <p>Your account is ready. You'll receive alerts for:
                <strong>{html_lib.escape(', '.join(keywords_list))}</strong></p>
+        </div>
         </div>
         """)
         flash("Account created! Check your email.", "sucesso")
@@ -320,8 +358,8 @@ def signup():
 
     return render_template("cadastro.html")
 
-# Legacy route alias
-app.add_url_rule("/cadastro", endpoint="cadastro", view_func=signup)
+# Legacy pt-BR URL — 301 redirect to the English canonical route
+app.add_url_rule("/cadastro", endpoint="cadastro", view_func=_legacy_redirect("signup"))
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -341,11 +379,15 @@ def login():
         cur.close()
         release_connection(conn)
 
-        if row and check_password_hash(row[4], password):
+        # row[4] (senha) is NULL for accounts created via Google OAuth —
+        # guard against passing None into check_password_hash.
+        if row and row[4] and check_password_hash(row[4], password):
             login_user(Client(row[0], row[1], row[2], row[3], row[5]), remember=True)
             return redirect(url_for("dashboard"))
-
-        flash("Incorrect email or password.", "erro")
+        elif row and not row[4]:
+            flash("This account signs in with Google. Use the button below instead.", "info")
+        else:
+            flash("Incorrect email or password.", "erro")
 
     return render_template("login.html")
 
@@ -355,6 +397,93 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for("index"))
+
+
+# ── Google OAuth ─────────────────────────────────────────────────────────────
+
+@app.route("/auth/google")
+@limiter.limit("10/minute")
+def auth_google():
+    if not google_oauth_enabled:
+        abort(404)
+    redirect_uri = url_for("auth_google_callback", _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.route("/auth/google/callback")
+@limiter.limit("10/minute")
+def auth_google_callback():
+    if not google_oauth_enabled:
+        abort(404)
+    try:
+        token = oauth.google.authorize_access_token()
+        userinfo = token.get("userinfo")
+        if not userinfo:
+            resp = oauth.google.get("https://openidconnect.googleapis.com/v1/userinfo", token=token)
+            userinfo = resp.json()
+    except Exception:
+        logger.warning("Google OAuth callback failed", exc_info=True)
+        flash("Google sign-in failed. Please try again.", "erro")
+        return redirect(url_for("login"))
+
+    google_id = userinfo.get("sub")
+    email = (userinfo.get("email") or "").strip().lower()
+    name = userinfo.get("name") or email.split("@")[0]
+
+    if not google_id or not email:
+        flash("Google sign-in failed. Please try again.", "erro")
+        return redirect(url_for("login"))
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # 1. Existing account already linked to this Google ID
+    cur.execute(
+        "SELECT id, nome, email, palavras_chave, plano FROM clientes WHERE google_id = %s",
+        (google_id,),
+    )
+    row = cur.fetchone()
+
+    if not row:
+        # 2. Existing account with the same email (created via password signup)
+        #    — link the Google ID to it rather than creating a duplicate.
+        cur.execute(
+            "SELECT id, nome, email, palavras_chave, plano FROM clientes WHERE email = %s",
+            (email,),
+        )
+        row = cur.fetchone()
+        if row:
+            cur.execute(
+                "UPDATE clientes SET google_id = %s, oauth_provider = 'google' WHERE id = %s",
+                (google_id, row[0]),
+            )
+            conn.commit()
+        else:
+            # 3. Brand-new account
+            cur.execute(
+                """INSERT INTO clientes (nome, email, senha, palavras_chave, ativo, google_id, oauth_provider)
+                   VALUES (%s, %s, NULL, %s, TRUE, %s, 'google')
+                   RETURNING id, nome, email, palavras_chave, plano""",
+                (name, email, [], google_id),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            send_email(email, "Welcome to TenderSentinel!", f"""
+            <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px 16px">
+        {EMAIL_BANNER}
+            <div style="background:#ffffff;padding:28px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-radius:0 0 12px 12px">
+                <h2 style="color:#131b2e">Welcome, {html_lib.escape(name)}!</h2>
+                <p>Your account is ready. Add some keywords from your dashboard to start
+                   receiving contract alerts.</p>
+            </div>
+            </div>
+            """)
+
+    cur.close()
+    release_connection(conn)
+
+    login_user(Client(row[0], row[1], row[2], row[3], row[4]), remember=True)
+    return redirect(url_for("dashboard"))
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
@@ -383,7 +512,7 @@ def dashboard():
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT l.orgao, l.objeto, l.valor, l.data_publicacao, l.link, l.naics_code, l.set_aside
+        SELECT l.id, l.orgao, l.objeto, l.valor, l.data_publicacao, l.link, l.naics_code, l.set_aside
         FROM licitacoes l
         WHERE ({filters_sql})
           AND (%s IS NULL OR l.valor >= %s)
@@ -399,18 +528,20 @@ def dashboard():
     if paid:
         licitacoes = []
         for row in rows:
-            agency, title, value, posted, link, naics_code, set_aside = row
-            score = calcular_score(
+            opp_id, agency, title, value, posted, link, naics_code, set_aside = row
+            score = calculate_score(
                 title, keywords, value,
                 naics_code=naics_code,
                 user_naics=current_user.naics_codes,
                 set_aside=set_aside,
                 user_set_asides=current_user.set_asides,
             )
-            licitacoes.append((agency, title, value, posted, link, score))
+            # opportunity id goes last (l[-1]) so it's easy to grab in the
+            # template regardless of which branch (paid/free) built the row
+            licitacoes.append((agency, title, value, posted, link, score, opp_id))
         licitacoes.sort(key=lambda x: x[5], reverse=True)
     else:
-        licitacoes = [row[:5] for row in rows]
+        licitacoes = [row[1:6] + (row[0],) for row in rows]
 
     return render_template(
         "dashboard.html",
@@ -471,10 +602,12 @@ def search_now():
                     count = len(new_matches)
                     plural = "opportunity" if count == 1 else "opportunities"
                     body = f"""
-                    <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-                        <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
+                    <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px 16px">
+        {EMAIL_BANNER}
+                    <div style="background:#ffffff;padding:28px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-radius:0 0 12px 12px">
                         <p style="color:#64748b;margin-bottom:1.5rem">{count} new {plural} found!</p>
                         {cards}
+                    </div>
                     </div>
                     """
                     send_email(cemail, f"TenderSentinel — {count} new {plural} found!", body)
@@ -497,8 +630,8 @@ def search_now():
     flash("Search started! If we find new matches, you'll receive an email shortly.", "info")
     return redirect(url_for("dashboard"))
 
-# Legacy route alias
-app.add_url_rule("/buscar-agora", endpoint="buscar_agora", view_func=search_now, methods=["POST"])
+# Note: no pt-BR alias here — this endpoint is only ever hit via the dashboard's
+# own form action (now pointing at /search-now), never an indexed/bookmarked URL.
 
 
 # ── My Account ───────────────────────────────────────────────────────────────
@@ -550,8 +683,8 @@ def my_account():
 
     return render_template("minha_conta.html", cliente=current_user, renovacao=renewal_date)
 
-# Legacy route alias
-app.add_url_rule("/minha-conta", endpoint="minha_conta", view_func=my_account, methods=["GET", "POST"])
+# Legacy pt-BR URL — 301 redirect to the English canonical route
+app.add_url_rule("/minha-conta", endpoint="minha_conta", view_func=_legacy_redirect("my_account"))
 
 
 # ── CSV Export ───────────────────────────────────────────────────────────────
@@ -622,7 +755,7 @@ def edit_keywords():
     return render_template("editar_palavras.html", cliente=current_user)
 
 # Legacy route alias
-app.add_url_rule("/editar-palavras", endpoint="editar_palavras", view_func=edit_keywords, methods=["GET", "POST"])
+app.add_url_rule("/editar-palavras", endpoint="editar_palavras", view_func=_legacy_redirect("edit_keywords"))
 
 
 # ── Edit Profile (NAICS / Set-Asides) ────────────────────────────────────────
@@ -654,7 +787,7 @@ def edit_profile():
     return render_template("editar_perfil.html", cliente=current_user, valid_set_asides=sorted(VALID_SET_ASIDES))
 
 # Legacy route alias
-app.add_url_rule("/editar-perfil", endpoint="editar_perfil", view_func=edit_profile, methods=["GET", "POST"])
+app.add_url_rule("/editar-perfil", endpoint="editar_perfil", view_func=_legacy_redirect("edit_profile"))
 
 
 # ── Stripe Subscription ─────────────────────────────────────────────────────
@@ -666,7 +799,10 @@ def subscribe(plan):
         flash("You already have an active subscription. To change plans, cancel the current one first.", "info")
         return redirect(url_for("dashboard"))
 
-    period = request.args.get("periodo", "mensal")
+    # Accept the new English query param, falling back to the old pt-BR one
+    # for any stale/bookmarked links still floating around.
+    period = request.args.get("period") or request.args.get("periodo", "monthly")
+    is_annual = period in ("annual", "anual")
     prices = {
         "basico":               os.getenv("STRIPE_PRICE_BASICO"),
         "profissional":         os.getenv("STRIPE_PRICE_PROFISSIONAL"),
@@ -675,7 +811,7 @@ def subscribe(plan):
         "profissional_anual":   os.getenv("STRIPE_PRICE_PROFISSIONAL_ANUAL"),
         "agencia_anual":        os.getenv("STRIPE_PRICE_AGENCIA_ANUAL"),
     }
-    price_id = prices.get(f"{plan}_anual" if period == "anual" else plan)
+    price_id = prices.get(f"{plan}_anual" if is_annual else plan)
 
     if not price_id:
         flash("Invalid plan.", "erro")
@@ -704,7 +840,7 @@ def subscribe(plan):
     return redirect(checkout_session.url, code=303)
 
 # Legacy route alias
-app.add_url_rule("/assinar/<plan>", endpoint="assinar", view_func=subscribe)
+app.add_url_rule("/assinar/<plan>", endpoint="assinar", view_func=_legacy_redirect("subscribe"))
 
 
 @app.route("/manage-subscription")
@@ -741,7 +877,7 @@ def manage_subscription():
         return redirect(url_for("index"))
 
 # Legacy route alias
-app.add_url_rule("/gerenciar-assinatura", endpoint="gerenciar_assinatura", view_func=manage_subscription)
+app.add_url_rule("/gerenciar-assinatura", endpoint="gerenciar_assinatura", view_func=_legacy_redirect("manage_subscription"))
 
 
 @app.route("/payment/success")
@@ -750,7 +886,7 @@ def payment_success():
     return render_template("pagamento_sucesso.html")
 
 # Legacy alias
-app.add_url_rule("/pagamento/sucesso", endpoint="pagamento_sucesso", view_func=payment_success)
+app.add_url_rule("/pagamento/sucesso", endpoint="pagamento_sucesso", view_func=_legacy_redirect("payment_success"))
 
 
 @app.route("/payment/cancelled")
@@ -760,7 +896,7 @@ def payment_cancelled():
     return redirect(url_for("index"))
 
 # Legacy alias
-app.add_url_rule("/pagamento/cancelado", endpoint="pagamento_cancelado", view_func=payment_cancelled)
+app.add_url_rule("/pagamento/cancelado", endpoint="pagamento_cancelado", view_func=_legacy_redirect("payment_cancelled"))
 
 
 # ── Stripe Webhook ───────────────────────────────────────────────────────────
@@ -886,14 +1022,16 @@ def newsletter_signup():
             conn.commit()
             # Send confirmation email
             send_email(email, "Confirm your TenderSentinel newsletter subscription", f"""
-            <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-                <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
+            <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px 16px">
+        {EMAIL_BANNER}
+            <div style="background:#ffffff;padding:28px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-radius:0 0 12px 12px">
                 <p>Hi, <strong>{html_lib.escape(name)}</strong>!</p>
                 <p>Click below to confirm your newsletter subscription:</p>
                 <p><a href="{BASE_URL}/newsletter/confirm/{token}"
-                   style="display:inline-block;background:#0f1f3d;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px">
+                   style="display:inline-block;background:#131b2e;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px">
                    Confirm subscription
                 </a></p>
+            </div>
             </div>
             """)
             flash("Welcome back! Check your email to confirm.", "sucesso")
@@ -911,24 +1049,27 @@ def newsletter_signup():
 
     # Double opt-in confirmation email (Q7)
     send_email(email, "Confirm your TenderSentinel newsletter subscription", f"""
-    <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:2rem">
-        <h1 style="color:#0f2444;font-family:Inter,sans-serif">TenderSentinel</h1>
+    <div style="font-family:Inter,sans-serif;max-width:600px;margin:0 auto;padding:24px 16px">
+        {EMAIL_BANNER}
+        <div style="background:#ffffff;padding:28px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-radius:0 0 12px 12px">
         <p>Hi, <strong>{html_lib.escape(name)}</strong>!</p>
         <p>Click below to confirm your newsletter subscription:</p>
         <p><a href="{BASE_URL}/newsletter/confirm/{token}"
-           style="display:inline-block;background:#0f1f3d;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px">
+           style="display:inline-block;background:#131b2e;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px">
            Confirm subscription
         </a></p>
         <p style="color:#64748b;font-size:0.85rem;margin-top:1.5rem">
             If you didn't request this, just ignore this email.
         </p>
+        </div>
     </div>
     """)
     flash("Check your email to confirm your subscription!", "sucesso")
     return redirect(url_for("index") + "#newsletter")
 
 # Legacy route alias
-app.add_url_rule("/newsletter/cadastro", endpoint="newsletter_cadastro", view_func=newsletter_signup, methods=["POST"])
+# Note: no pt-BR alias — this is a form action (updated to /newsletter/signup),
+# not a URL anyone would bookmark or that search engines would index.
 
 
 @app.route("/newsletter/confirm/<token>")
@@ -960,15 +1101,21 @@ def newsletter_unsubscribe(token):
     return redirect(url_for("index"))
 
 # Legacy route alias
-app.add_url_rule("/newsletter/descadastro/<token>", endpoint="newsletter_descadastro", view_func=newsletter_unsubscribe)
+app.add_url_rule("/newsletter/descadastro/<token>", endpoint="newsletter_descadastro", view_func=_legacy_redirect("newsletter_unsubscribe"))
 
 
-# ── Planos page ──────────────────────────────────────────────────────────────
+# ── Pricing page ─────────────────────────────────────────────────────────────
 
-@app.route("/planos")
-def planos():
+@app.route("/pricing")
+def pricing():
     cliente = current_user if current_user.is_authenticated else None
     return render_template("planos.html", cliente=cliente)
+
+# Legacy pt-BR URL — 301 redirect to the English canonical route.
+# IMPORTANT: /planos is currently listed in sitemap.xml and may already be
+# indexed by Google — keep this redirect so that authority transfers instead
+# of returning a 404.
+app.add_url_rule("/planos", endpoint="planos", view_func=_legacy_redirect("pricing"))
 
 
 # ── Blog ─────────────────────────────────────────────────────────────────────
@@ -1072,7 +1219,7 @@ def sitemap():
     urls = [
         {"loc": base_url + "/", "lastmod": today, "priority": "1.0"},
         {"loc": base_url + "/blog", "lastmod": today, "priority": "0.8"},
-        {"loc": base_url + "/planos", "lastmod": today, "priority": "0.7"},
+        {"loc": base_url + "/pricing", "lastmod": today, "priority": "0.7"},
         {"loc": base_url + "/signup", "lastmod": today, "priority": "0.6"},
     ]
     for p in posts:
@@ -1433,6 +1580,31 @@ def api_rescore():
     t = threading.Thread(target=rescore_user_opportunities, args=(current_user.id,), daemon=True)
     t.start()
     return jsonify({"ok": True, "message": "Rescoring started"})
+
+
+@app.route("/api/v1/opportunities/<int:opp_id>/summary")
+@login_required
+@limiter.limit("30/minute")
+def api_opportunity_summary(opp_id):
+    features = get_plan_features(current_user.plano)
+    if not features.get("ai_summary"):
+        return jsonify({
+            "error": "AI summaries are available on the Professional and Agency plans.",
+            "upgrade_hint": True,
+        }), 403
+
+    if not ai_summary_enabled:
+        return jsonify({"error": "AI summaries are not configured on this server yet."}), 503
+
+    from app.services.summarizer import get_or_generate_summary
+    try:
+        result = get_or_generate_summary(opp_id)
+    except ValueError:
+        return jsonify({"error": "Opportunity not found."}), 404
+    except Exception:
+        return jsonify({"error": "Could not generate summary right now. Please try again."}), 502
+
+    return jsonify({"summary": result})
 
 
 # ── Decision / Pipeline API ──────────────────────────────────────────────────
