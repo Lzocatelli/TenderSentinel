@@ -90,6 +90,26 @@ def get_plan_features(plan: str | None) -> dict:
     return PLAN_FEATURES.get(plan) or PLAN_FEATURES[None]
 
 
+# English display name for a plan, regardless of which slug is stored —
+# some accounts still carry the pre-anglicization pt-BR value (e.g.
+# "gratuito") in clientes.plano, so this can't just title-case the raw value.
+PLAN_DISPLAY_NAMES = {
+    None: "Free",
+    "gratuito": "Free",
+    "basic": "Basic",
+    "basico": "Basic",
+    "professional": "Professional",
+    "profissional": "Professional",
+    "agency": "Agency",
+    "agencia": "Agency",
+}
+
+
+def plan_display_name(plan: str | None) -> str:
+    """Human-readable, English plan name for display in templates."""
+    return PLAN_DISPLAY_NAMES.get(plan, "Free")
+
+
 # ── Dashboard / Export ───────────────────────────────────────────────────────
 
 DASHBOARD_LIMIT = 50

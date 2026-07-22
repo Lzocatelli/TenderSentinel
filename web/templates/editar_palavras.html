@@ -4,23 +4,9 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Edit Keywords — TenderSentinel</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<link href="{{ url_for('static', filename='css/tailwind.css') }}" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&family=Work+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0&display=swap" rel="stylesheet"/>
-<script>
-tailwind.config = {
-    theme: {
-        extend: {
-            fontFamily: {
-                headline: ['Inter', 'sans-serif'],
-                body: ['Work Sans', 'sans-serif'],
-                label: ['Space Grotesk', 'sans-serif'],
-            },
-            colors: { navy: '#131b2e', gold: '#fc7218' }
-        }
-    }
-}
-</script>
 <style>
 body { font-family: 'Work Sans', sans-serif; }
 .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; vertical-align: middle; }
@@ -44,7 +30,7 @@ body { font-family: 'Work Sans', sans-serif; }
             <span class="material-symbols-outlined text-4xl text-gold mb-3 block">key</span>
             <h1 class="font-headline font-black text-3xl text-navy">Edit Keywords</h1>
             <p class="text-slate-500 mt-2 font-body text-sm">
-                Plan: <span class="font-semibold text-navy capitalize">{{ cliente.plano or 'Free' }}</span> —
+                Plan: <span class="font-semibold text-navy">{{ cliente.plano | plan_name }}</span> —
                 {% if cliente.limite_palavras %}up to {{ cliente.limite_palavras }} keywords{% else %}unlimited keywords{% endif %}
             </p>
         </div>

@@ -13,71 +13,9 @@
 <meta name="twitter:card" content="summary_large_image"/>
 {% endblock %}
 
-<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="{{ url_for('static', filename='css/tailwind.css') }}" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&family=Work+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
-    tailwind.config = {
-        darkMode: "class",
-        theme: {
-            extend: {
-                colors: {
-                    "surface-container-highest": "#d3e4fe",
-                    "surface-dim": "#cbdbf5",
-                    "on-background": "#0b1c30",
-                    "on-surface": "#0b1c30",
-                    "inverse-on-surface": "#eaf1ff",
-                    "on-secondary": "#ffffff",
-                    "secondary": "#9f4200",
-                    "secondary-container": "#fc7218",
-                    "surface-container-lowest": "#ffffff",
-                    "surface-container-high": "#dce9ff",
-                    "outline-variant": "#c6c6cd",
-                    "surface": "#f8f9ff",
-                    "surface-container-low": "#eff4ff",
-                    "primary-container": "#131b2e",
-                    "on-primary-container": "#7c839b",
-                    "background": "#f8f9ff",
-                    "primary-fixed": "#dae2fd",
-                    "secondary-fixed": "#ffdbcb",
-                    "secondary-fixed-dim": "#ffb692",
-                    "surface-variant": "#d3e4fe",
-                    "primary": "#000000",
-                    "on-surface-variant": "#45464d",
-                    "surface-container": "#e5eeff",
-                    "on-primary": "#ffffff",
-                    "outline": "#76777d",
-                },
-                fontFamily: {
-                    "headline": ["Inter"],
-                    "body": ["Work Sans"],
-                    "label": ["Space Grotesk"]
-                },
-                borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
-                typography: (theme) => ({
-                    DEFAULT: {
-                        css: {
-                            color: theme("colors.on-surface"),
-                            fontFamily: theme("fontFamily.body").join(","),
-                            fontSize: "1.0625rem",
-                            lineHeight: "1.8",
-                            maxWidth: "none",
-                            a: { color: theme("colors.secondary"), textDecoration: "none", "&:hover": { textDecoration: "underline" } },
-                            h1: { fontFamily: theme("fontFamily.headline").join(","), fontWeight: "900", color: theme("colors.on-surface") },
-                            h2: { fontFamily: theme("fontFamily.headline").join(","), fontWeight: "800", color: theme("colors.on-surface"), marginTop: "2rem" },
-                            h3: { fontFamily: theme("fontFamily.headline").join(","), fontWeight: "700", color: theme("colors.on-surface") },
-                            blockquote: { borderLeftColor: theme("colors.secondary"), backgroundColor: theme("colors.surface-container-low"), padding: "1rem 1.5rem", borderRadius: "0.25rem", fontStyle: "normal", color: theme("colors.on-surface") },
-                            code: { backgroundColor: theme("colors.surface-container-high"), padding: "0.15rem 0.4rem", borderRadius: "0.2rem", fontWeight: "500" },
-                            "code::before": { content: '""' },
-                            "code::after": { content: '""' },
-                            pre: { backgroundColor: theme("colors.primary-container"), color: "#e2e8f0" },
-                        },
-                    },
-                }),
-            },
-        },
-    }
-</script>
 <style>
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; }
 </style>

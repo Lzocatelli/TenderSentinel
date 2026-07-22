@@ -30,7 +30,8 @@ from app.alertas import send_email
 from app.config import (BASE_URL, DASHBOARD_LIMIT, CSV_EXPORT_LIMIT,
                         COUNTER_CACHE_TTL_MINUTES, TRIAL_PERIOD_DAYS,
                         VALID_SET_ASIDES, PLAN_LIMITS, FREE_KEYWORD_LIMIT,
-                        EMAIL_BANNER, ai_summary_enabled, get_plan_features)
+                        EMAIL_BANNER, ai_summary_enabled, get_plan_features,
+                        plan_display_name)
 from app.database import create_tables, get_connection, release_connection
 from app.score import calculate_score
 from app.utils import format_currency, keyword_limit
@@ -71,6 +72,8 @@ app.config.update(
 def inject_now():
     return {"now": datetime.now(), "google_oauth_enabled": google_oauth_enabled,
              "ai_summary_enabled": ai_summary_enabled}
+
+app.jinja_env.filters["plan_name"] = plan_display_name
 
 # HTTPS redirect for production (Q10)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)

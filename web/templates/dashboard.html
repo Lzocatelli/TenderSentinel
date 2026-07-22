@@ -4,41 +4,9 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Dashboard — TenderSentinel</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="{{ url_for('static', filename='css/tailwind.css') }}" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&family=Work+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<script>
-tailwind.config = {
-    theme: {
-        extend: {
-            colors: {
-                "surface": "#f8f9ff",
-                "surface-container-low": "#eff4ff",
-                "surface-container": "#e5eeff",
-                "surface-container-high": "#dce9ff",
-                "surface-container-highest": "#d3e4fe",
-                "surface-container-lowest": "#ffffff",
-                "on-surface": "#0b1c30",
-                "on-surface-variant": "#45464d",
-                "outline-variant": "#c6c6cd",
-                "primary": "#000000",
-                "primary-container": "#131b2e",
-                "on-primary-container": "#7c839b",
-                "secondary": "#9f4200",
-                "secondary-container": "#fc7218",
-                "on-secondary-container": "#592200",
-                "on-tertiary-container": "#008cc7",
-                "tertiary-container": "#001e2f",
-            },
-            fontFamily: {
-                "headline": ["Inter"],
-                "body": ["Work Sans"],
-                "label": ["Space Grotesk"]
-            },
-        },
-    },
-}
-</script>
 <style>
     .material-symbols-outlined {
         font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
@@ -92,7 +60,7 @@ tailwind.config = {
         </div>
         <h1 class="font-headline text-3xl font-black tracking-tight">Hello, {{ cliente.nome.split()[0] }}</h1>
         <p class="text-on-surface-variant font-body text-sm mt-1">
-            Plan: <strong class="text-on-surface capitalize">{{ cliente.plano or 'Free' }}</strong>
+            Plan: <strong class="text-on-surface">{{ cliente.plano | plan_name }}</strong>
             · {{ cliente.limite_palavras if cliente.limite_palavras else '∞' }} keywords
             · <a href="/manage-subscription" class="text-secondary hover:underline">Manage subscription</a>
         </p>

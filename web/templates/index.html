@@ -13,73 +13,9 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="TenderSentinel — US Procurement Intelligence">
 <meta name="twitter:description" content="Monitor SAM.gov contracts with NAICS scoring and set-aside matching. Start your free trial.">
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="{{ url_for('static', filename='css/tailwind.css') }}" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&family=Work+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
-    tailwind.config = {
-        darkMode: "class",
-        theme: {
-            extend: {
-                colors: {
-                    "surface-container-highest": "#d3e4fe",
-                    "surface-dim": "#cbdbf5",
-                    "on-secondary-fixed": "#341100",
-                    "on-background": "#0b1c30",
-                    "on-surface": "#0b1c30",
-                    "tertiary-container": "#001e2f",
-                    "error": "#ba1a1a",
-                    "inverse-on-surface": "#eaf1ff",
-                    "on-secondary": "#ffffff",
-                    "secondary": "#9f4200",
-                    "surface-tint": "#565e74",
-                    "secondary-container": "#fc7218",
-                    "primary-fixed-dim": "#bec6e0",
-                    "inverse-primary": "#bec6e0",
-                    "on-primary-fixed": "#131b2e",
-                    "surface-container-lowest": "#ffffff",
-                    "surface-container-high": "#dce9ff",
-                    "outline-variant": "#c6c6cd",
-                    "surface": "#f8f9ff",
-                    "on-tertiary-fixed": "#001e2f",
-                    "surface-container-low": "#eff4ff",
-                    "on-tertiary-fixed-variant": "#004c6e",
-                    "surface-bright": "#f8f9ff",
-                    "primary-container": "#131b2e",
-                    "on-primary-container": "#7c839b",
-                    "background": "#f8f9ff",
-                    "on-primary-fixed-variant": "#3f465c",
-                    "tertiary-fixed": "#c9e6ff",
-                    "secondary-fixed": "#ffdbcb",
-                    "inverse-surface": "#213145",
-                    "primary-fixed": "#dae2fd",
-                    "on-error": "#ffffff",
-                    "secondary-fixed-dim": "#ffb692",
-                    "surface-variant": "#d3e4fe",
-                    "tertiary": "#000000",
-                    "primary": "#000000",
-                    "on-surface-variant": "#45464d",
-                    "on-tertiary-container": "#008cc7",
-                    "on-secondary-fixed-variant": "#793100",
-                    "surface-container": "#e5eeff",
-                    "tertiary-fixed-dim": "#89ceff",
-                    "error-container": "#ffdad6",
-                    "on-primary": "#ffffff",
-                    "on-error-container": "#93000a",
-                    "outline": "#76777d",
-                    "on-tertiary": "#ffffff",
-                    "on-secondary-container": "#592200"
-                },
-                fontFamily: {
-                    "headline": ["Inter"],
-                    "body": ["Work Sans"],
-                    "label": ["Space Grotesk"]
-                },
-                borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
-            },
-        },
-    }
-</script>
 <style>
     .material-symbols-outlined {
         font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
