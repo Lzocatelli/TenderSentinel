@@ -1,4 +1,5 @@
 requests
+authlib
 psycopg2-binary
 python-dotenv
 apscheduler

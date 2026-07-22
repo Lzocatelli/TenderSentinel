@@ -100,11 +100,11 @@ def _build_opportunity_card(agency, title, value, link, score=None):
     badge = _score_badge_html(score)
     return f"""
     <div style="border:1px solid #e2e8f0;border-radius:10px;padding:16px 18px;margin-bottom:12px;background:#ffffff">
-        <p style="font-size:14px;font-weight:600;color:#0f1f3d;margin:0 0 6px;line-height:1.45">{title_s}{badge}</p>
+        <p style="font-size:14px;font-weight:600;color:#131b2e;margin:0 0 6px;line-height:1.45">{title_s}{badge}</p>
         <p style="font-size:12px;color:#64748b;margin:0 0 12px">
-            {agency_s} &nbsp;·&nbsp; <strong style="color:#0f1f3d">{value_s}</strong>
+            {agency_s} &nbsp;·&nbsp; <strong style="color:#131b2e">{value_s}</strong>
         </p>
-        <a href="{link_s}" style="display:inline-block;background:#0f1f3d;color:#ffffff;text-decoration:none;font-size:12px;font-weight:600;padding:7px 16px;border-radius:6px">View opportunity →</a>
+        <a href="{link_s}" style="display:inline-block;background:#131b2e;color:#ffffff;text-decoration:none;font-size:12px;font-weight:600;padding:7px 16px;border-radius:6px">View opportunity →</a>
     </div>
     """
 
@@ -180,25 +180,25 @@ def dispatch_alerts():
     {EMAIL_BANNER}
 
     <div style="background:#ffffff;padding:28px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0">
-        <p style="font-size:16px;font-weight:600;color:#0f1f3d;margin:0 0 4px">
+        <p style="font-size:16px;font-weight:600;color:#131b2e;margin:0 0 4px">
             Hi, {first_name}!
         </p>
         <p style="font-size:13px;color:#64748b;margin:0 0 24px;line-height:1.6">
-            We found <strong style="color:#0f1f3d">{count} new {plural}</strong> matching your profile. Check them out below:
+            We found <strong style="color:#131b2e">{count} new {plural}</strong> matching your profile. Check them out below:
         </p>
 
         {cards}
 
         <div style="text-align:center;margin-top:24px">
             <a href="{BASE_URL}/dashboard"
-               style="display:inline-block;background:#d4af37;color:#0f1f3d;text-decoration:none;
+               style="display:inline-block;background:#fc7218;color:#ffffff;text-decoration:none;
                       font-size:14px;font-weight:700;padding:12px 28px;border-radius:8px">
                 View all in dashboard
             </a>
         </div>
     </div>
 
-    <div style="background:#0f1f3d;padding:18px 32px;text-align:center;border-radius:0 0 12px 12px">
+    <div style="background:#131b2e;padding:18px 32px;text-align:center;border-radius:0 0 12px 12px">
         <p style="font-size:11px;color:rgba(255,255,255,0.4);margin:0;line-height:1.6">
             You receive these alerts because we monitor federal contracts for your profile.<br>
             <a href="{BASE_URL}/my-account" style="color:rgba(255,255,255,0.4)">Manage account</a>

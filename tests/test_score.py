@@ -1,6 +1,6 @@
 """Unit tests for app/score.py"""
 import unittest
-from app.score import calcular_score, _keyword_score, _naics_score, _set_aside_score, _value_bonus
+from app.score import calculate_score, _keyword_score, _naics_score, _set_aside_score, _value_bonus
 
 
 class TestKeywordScore(unittest.TestCase):
@@ -74,12 +74,12 @@ class TestValueBonus(unittest.TestCase):
         self.assertLessEqual(_value_bonus(100_000_000), 1.0)
 
 
-class TestCalcularScore(unittest.TestCase):
+class TestCalculateScore(unittest.TestCase):
     def test_full_score_components(self):
-        score = calcular_score(
+        score = calculate_score(
             "cloud computing services",
             ["cloud computing"],
-            valor=500_000,
+            value=500_000,
             naics_code="541512",
             user_naics=["541512"],
             set_aside="SDVOSB",
@@ -89,14 +89,14 @@ class TestCalcularScore(unittest.TestCase):
         self.assertLessEqual(score, 10)
 
     def test_no_match_returns_zero(self):
-        score = calcular_score("Navy ship maintenance", ["software"], None)
+        score = calculate_score("Navy ship maintenance", ["software"], None)
         self.assertEqual(score, 0)
 
     def test_score_never_exceeds_10(self):
-        score = calcular_score(
+        score = calculate_score(
             "software development IT cloud",
             ["software", "development", "IT", "cloud"],
-            valor=10_000_000,
+            value=10_000_000,
             naics_code="541512",
             user_naics=["541512"],
             set_aside="SBA",
@@ -105,7 +105,7 @@ class TestCalcularScore(unittest.TestCase):
         self.assertLessEqual(score, 10)
 
     def test_score_never_negative(self):
-        score = calcular_score("", [], None)
+        score = calculate_score("", [], None)
         self.assertGreaterEqual(score, 0)
 
 

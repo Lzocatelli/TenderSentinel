@@ -114,6 +114,8 @@ def create_tables():
         ("clientes", "stripe_last_session_id", "TEXT"),
         ("clientes", "naics_codes", "TEXT[]"),
         ("clientes", "set_asides", "TEXT[]"),
+        ("clientes", "google_id", "TEXT"),
+        ("clientes", "oauth_provider", "TEXT"),
     ]
     for table, col, col_type in migrations:
         try:
@@ -151,6 +153,7 @@ def create_tables():
         "CREATE INDEX IF NOT EXISTS idx_alertas_cliente ON alertas_enviados(cliente_id)",
         "CREATE INDEX IF NOT EXISTS idx_alertas_licitacao ON alertas_enviados(licitacao_id)",
         "CREATE INDEX IF NOT EXISTS idx_newsletter_email ON newsletter(email)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_google_id ON clientes(google_id) WHERE google_id IS NOT NULL",
     ]
     for idx_sql in indexes:
         try:
@@ -347,6 +350,25 @@ def create_tables():
         );
     """)
 
+    # ── Feature 4: AI-generated opportunity summaries (cached) ─────────────
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS opportunity_summaries (
+            id SERIAL PRIMARY KEY,
+            opportunity_id INTEGER NOT NULL REFERENCES licitacoes(id) ON DELETE CASCADE,
+            source_hash VARCHAR(64) NOT NULL,
+            summary TEXT,
+            key_requirements JSONB,
+            documents_needed JSONB,
+            important_dates JSONB,
+            risk_flags JSONB,
+            model_used VARCHAR(50),
+            input_tokens INTEGER,
+            output_tokens INTEGER,
+            generated_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(opportunity_id)
+        );
+    """)
+
     # ── New indexes ────────────────────────────────────────────────────────
     new_indexes = [
         "CREATE INDEX IF NOT EXISTS idx_match_scores_user_score ON opportunity_match_scores(user_id, overall_score DESC)",
@@ -356,6 +378,7 @@ def create_tables():
         "CREATE INDEX IF NOT EXISTS idx_historical_naics ON historical_awards(naics_code)",
         "CREATE INDEX IF NOT EXISTS idx_historical_agency ON historical_awards(agency_name)",
         "CREATE INDEX IF NOT EXISTS idx_historical_date ON historical_awards(award_date)",
+        "CREATE INDEX IF NOT EXISTS idx_summaries_opp ON opportunity_summaries(opportunity_id)",
     ]
     for idx_sql in new_indexes:
         try:
