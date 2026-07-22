@@ -45,15 +45,22 @@ def fetch_opportunities(date_from=None, date_to=None):
                 logger.info(f"Fetched {len(results)} opportunities from SAM.gov")
                 return results
             else:
-                logger.error(f"SAM.gov returned status {response.status_code}")
-                return []
+                # Raise instead of returning [] — an empty list looks
+                # identical to "no new opportunities today" to every caller,
+                # so an expired key / exhausted quota / API change would
+                # silently save 0 results forever instead of surfacing as
+                # the failure it is (see fetch_and_alert's admin email,
+                # which only fires on a raised exception).
+                raise RuntimeError(
+                    f"SAM.gov returned status {response.status_code}: {response.text[:500]}"
+                )
 
         except requests.exceptions.Timeout:
             logger.warning(f"SAM.gov timeout (attempt {attempt + 1}/3)")
             if attempt < 2:
                 time.sleep(3)
             else:
-                logger.error("SAM.gov did not respond after 3 attempts")
+                raise RuntimeError("SAM.gov did not respond after 3 attempts")
 
     return []
 

@@ -593,7 +593,11 @@ def search_now():
 
         try:
             from app.scraper import fetch_opportunities, save_opportunities
-            opportunities = fetch_opportunities()
+            try:
+                opportunities = fetch_opportunities()
+            except Exception as e:
+                logger.error(f"Manual search: SAM.gov fetch failed: {e}")
+                return
             save_opportunities(opportunities)
 
             conn = get_connection()
