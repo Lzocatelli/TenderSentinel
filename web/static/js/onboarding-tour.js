@@ -1,12 +1,15 @@
 /**
  * Lightweight, dependency-free spotlight tour.
  * Usage: TenderSentinelTour.start([{selector, title, text}, ...], {storageKey});
- * The highlighted element itself stays fully clickable (the dim overlay is
- * built as 4 panels framing it, not a single sheet on top) so "click here"
- * steps can send the user straight into the real action. Clicking outside
- * the highlight, or Skip/Got it, dismisses the tour. Skips gracefully if a
- * step's selector isn't on the page, and never re-shows once storageKey is
- * set in localStorage.
+ * The dim backdrop is a single element's box-shadow cast around a rounded
+ * cutout at the target's rect, so the highlight itself stays a clean rounded
+ * rectangle (no square corners breaking the rounded design language) and,
+ * since that element has pointer-events:none, the highlighted element below
+ * it stays genuinely clickable — "click here" steps send the user straight
+ * into the real action. Skip/Next are the only way to dismiss (there's no
+ * backdrop to intercept a click). Skips gracefully if a step's selector
+ * isn't on the page, and never re-shows once storageKey is set in
+ * localStorage.
  */
 (function () {
     function start(steps, opts) {
@@ -20,7 +23,6 @@
         if (!visibleSteps.length) return;
 
         var i = 0;
-        var bars = [];
         var ring, tooltip;
 
         function markSeen() {
@@ -28,7 +30,6 @@
         }
 
         function cleanup() {
-            bars.forEach(function (el) { el.remove(); });
             if (ring) ring.remove();
             if (tooltip) tooltip.remove();
             window.removeEventListener('resize', render);
@@ -39,17 +40,6 @@
             i++;
             if (i >= visibleSteps.length) { cleanup(); return; }
             render();
-        }
-
-        function ensureBars() {
-            if (bars.length) return;
-            for (var n = 0; n < 4; n++) {
-                var bar = document.createElement('div');
-                bar.style.cssText = 'position:fixed;z-index:9998;background:rgba(15,23,42,.6);cursor:pointer;';
-                bar.addEventListener('click', cleanup);
-                document.body.appendChild(bar);
-                bars.push(bar);
-            }
         }
 
         function render() {
@@ -72,28 +62,19 @@
             var hW = rect.width + pad * 2, hH = rect.height + pad * 2;
             var vw = window.innerWidth, vh = window.innerHeight;
 
-            ensureBars();
-            // top
-            bars[0].style.top = '0px'; bars[0].style.left = '0px';
-            bars[0].style.width = vw + 'px'; bars[0].style.height = Math.max(0, hTop) + 'px';
-            // bottom
-            bars[1].style.top = Math.max(0, hTop + hH) + 'px'; bars[1].style.left = '0px';
-            bars[1].style.width = vw + 'px'; bars[1].style.height = Math.max(0, vh - (hTop + hH)) + 'px';
-            // left (middle band)
-            bars[2].style.top = Math.max(0, hTop) + 'px'; bars[2].style.left = '0px';
-            bars[2].style.width = Math.max(0, hLeft) + 'px'; bars[2].style.height = hH + 'px';
-            // right (middle band)
-            bars[3].style.top = Math.max(0, hTop) + 'px'; bars[3].style.left = Math.max(0, hLeft + hW) + 'px';
-            bars[3].style.width = Math.max(0, vw - (hLeft + hW)) + 'px'; bars[3].style.height = hH + 'px';
-
             if (!ring) {
                 ring = document.createElement('div');
                 ring.style.cssText = 'position:fixed;z-index:9998;pointer-events:none;' +
-                    'border-radius:10px;border:2px solid #fc7218;box-shadow:0 0 0 3px rgba(252,114,24,.25);';
+                    'border-radius:12px;border:2px solid #fc7218;' +
+                    'transition:top .2s ease,left .2s ease,width .2s ease,height .2s ease;';
                 document.body.appendChild(ring);
             }
             ring.style.top = hTop + 'px'; ring.style.left = hLeft + 'px';
             ring.style.width = hW + 'px'; ring.style.height = hH + 'px';
+            // Box-shadow spotlight: a huge shadow cast from the (rounded)
+            // ring itself dims the rest of the page, so the cutout follows
+            // the same border-radius as the ring — no square corners.
+            ring.style.boxShadow = '0 0 0 9999px rgba(15,23,42,.6), 0 0 0 3px rgba(252,114,24,.25) inset';
 
             if (!tooltip) {
                 tooltip = document.createElement('div');
