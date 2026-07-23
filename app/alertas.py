@@ -3,7 +3,9 @@ import logging
 import os
 import smtplib
 
+import boto3
 import requests
+from botocore.exceptions import BotoCoreError, ClientError
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -20,9 +22,29 @@ logger = logging.getLogger("tendersentinel.alertas")
 def send_email(recipient, subject, body):
     """
     Sends email using, in order of priority:
-    1) SendGrid API (recommended for production)
-    2) Gmail SMTP fallback (local use)
+    1) Amazon SES (recommended for production)
+    2) SendGrid API
+    3) Gmail SMTP fallback (local use)
     """
+    ses_from = os.getenv("SES_FROM_EMAIL")
+
+    if ses_from:
+        try:
+            client = boto3.client("ses", region_name=os.getenv("AWS_SES_REGION", "us-east-1"))
+            client.send_email(
+                Source=ses_from,
+                Destination={"ToAddresses": [recipient]},
+                Message={
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": body, "Charset": "UTF-8"}},
+                },
+            )
+            logger.info(f"Email sent to {recipient} via Amazon SES")
+            return True
+        except (ClientError, BotoCoreError) as e:
+            logger.error(f"SES error: {e}")
+            return False
+
     sendgrid_key = os.getenv("SENDGRID_API_KEY")
     sendgrid_from = os.getenv("SENDGRID_FROM_EMAIL")
 
