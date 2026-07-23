@@ -67,7 +67,7 @@
             <span class="pulse-dot"></span>
             <span class="font-label text-xs uppercase tracking-widest text-on-surface-variant">Live monitoring active</span>
         </div>
-        <h1 class="font-headline text-3xl font-black tracking-tight">Hello, {{ cliente.nome.split()[0] }}</h1>
+        <h1 id="onboarding-welcome" class="font-headline text-3xl font-black tracking-tight">Hello, {{ cliente.nome.split()[0] }}</h1>
         <p class="text-on-surface-variant font-body text-sm mt-1">
             Plan: <strong class="text-on-surface">{{ cliente.plano | plan_name }}</strong>
             · {{ cliente.limite_palavras if cliente.limite_palavras else '∞' }} keywords
@@ -133,7 +133,7 @@
         <!-- Table header -->
         <div class="px-6 py-4 border-b border-outline-variant/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-                <h2 class="font-headline font-bold text-lg">Matching Opportunities</h2>
+                <h2 id="onboarding-opportunities" class="font-headline font-bold text-lg">Matching Opportunities</h2>
                 <p class="font-label text-xs text-on-surface-variant mt-0.5">Alerts sent daily at 9am EST</p>
             </div>
             <div class="flex items-center gap-3 flex-wrap">
@@ -336,6 +336,34 @@ async function toggleSummary(oppId) {
         if (btn) btn.disabled = false;
     }
 }
+</script>
+
+<script src="{{ url_for('static', filename='js/onboarding-tour.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    TenderSentinelTour.start([
+        {
+            selector: '#onboarding-welcome',
+            title: 'Welcome to TenderSentinel!',
+            text: "Let's take a 60-second tour so you get matched with the right contracts faster."
+        },
+        {
+            selector: 'a[href="/edit-keywords"]',
+            title: 'Your keywords',
+            text: 'These are the exact terms we search for in new contracts every day. Click here anytime to add or change them.'
+        },
+        {
+            selector: 'a[href="/edit-profile"]',
+            title: 'Complete your profile',
+            text: 'Add your NAICS codes and certifications (SBA, 8(a), HUBZone, WOSB, SDVOSB) here — this is what powers your match score. Click here to set it up now.'
+        },
+        {
+            selector: '#onboarding-opportunities',
+            title: 'Matching opportunities',
+            text: "New contracts that match your profile land here, and we'll also email you every morning at 9am ET."
+        }
+    ], { storageKey: 'ts_onboarding_v1_{{ cliente.id }}' });
+});
 </script>
 
 </body>
