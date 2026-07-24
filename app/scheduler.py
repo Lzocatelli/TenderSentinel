@@ -72,16 +72,6 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    # Daily: post an internal business snapshot to Slack
-    scheduler.add_job(
-        post_daily_analytics_to_slack,
-        "cron",
-        hour=9,
-        minute=15,
-        id="daily_analytics_slack",
-        replace_existing=True,
-    )
-
     logger.info("Scheduler started. Waiting for jobs...")
     scheduler.start()
 
@@ -94,19 +84,6 @@ def _recompute_statistics():
         logger.info("Value statistics recomputed")
     except Exception as e:
         logger.error(f"Statistics recomputation failed: {e}")
-
-
-def post_daily_analytics_to_slack():
-    """Daily job: post an internal business snapshot to Slack."""
-    try:
-        from app.services.analytics import get_daily_snapshot, format_snapshot_text
-        from app.slack import post_to_slack
-
-        snapshot = get_daily_snapshot()
-        post_to_slack(format_snapshot_text(snapshot))
-        logger.info("Daily analytics snapshot posted to Slack")
-    except Exception as e:
-        logger.error(f"Daily analytics Slack post failed: {e}")
 
 
 # Legacy aliases
