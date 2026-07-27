@@ -34,6 +34,8 @@ from app.config import (BASE_URL, DASHBOARD_LIMIT, CSV_EXPORT_LIMIT,
                         plan_display_name)
 from app.database import create_tables, get_connection, release_connection
 from app.score import calculate_score
+from app.services.opportunity_agent import format_opportunities_slack, get_recent_opportunities
+from app.slack import verify_slack_signature
 from app.utils import format_currency, keyword_limit
 
 load_dotenv(override=False)
@@ -218,7 +220,7 @@ def verify_csrf():
     if request.method not in ("POST", "PUT", "DELETE"):
         return
     if (request.endpoint or "") in {"api_counter", "health", "webhook_stripe",
-                                     "blog_preview_api", "api_contador"}:
+                                     "blog_preview_api", "api_contador", "slack_commands"}:
         return
     token_form = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
     token_session = session.get("_csrf_token")
@@ -1697,6 +1699,30 @@ def dashboard_profile():
 @login_required
 def dashboard_pipeline():
     return render_template("dashboard_pipeline.html")
+
+
+# ── Slack Slash Commands ──────────────────────────────────────────────────────
+
+@app.route("/slack/commands", methods=["POST"])
+@limiter.limit("20/minute")
+def slack_commands():
+    raw_body = request.get_data()
+    timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
+    signature = request.headers.get("X-Slack-Signature", "")
+
+    if not verify_slack_signature(raw_body, timestamp, signature):
+        abort(401)
+
+    command = request.form.get("command", "")
+    text = request.form.get("text", "").strip()
+
+    if command == "/opps":
+        naics_code = text if text.isdigit() and len(text) <= 10 else None
+        opportunities = get_recent_opportunities(naics_code=naics_code)
+        message = format_opportunities_slack(opportunities, naics_code=naics_code)
+        return jsonify({"response_type": "ephemeral", "text": message})
+
+    return jsonify({"response_type": "ephemeral", "text": f"Unknown command: {command}"})
 
 
 if __name__ == "__main__":
