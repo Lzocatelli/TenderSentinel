@@ -22,9 +22,18 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="TenderSentinel — US Procurement Intelligence">
 <meta name="twitter:description" content="Monitor SAM.gov contracts with NAICS scoring and set-aside matching. Start your free trial.">
+<link href="{{ url_for('static', filename='favicon.ico') }}" rel="icon" sizes="any"/>
+<link href="{{ url_for('static', filename='img/favicon.png') }}" rel="icon" type="image/png"/>
+<link href="{{ url_for('static', filename='img/apple-touch-icon.png') }}" rel="apple-touch-icon"/>
 <link href="{{ url_for('static', filename='css/tailwind.css') }}" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&family=Work+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" media="print" onload="this.media='all'"/>
+<noscript>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&family=Work+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+</noscript>
 <style>
     .material-symbols-outlined {
         font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
@@ -93,6 +102,7 @@
 </div>
 </nav>
 
+<main>
 <!-- Hero -->
 <section class="relative pt-32 pb-24 overflow-hidden bg-gradient-to-b from-primary-container to-surface">
 <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -117,8 +127,21 @@
         </div>
     </div>
     <div class="lg:col-span-5 relative">
-        <div class="aspect-square bg-surface-container-highest rounded-xl overflow-hidden shadow-2xl rotate-3 relative z-10">
-            <img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuChr2fZeqjtN0XYqOZnzOIIOeuID9bA5OEUGRo8Fz7AjkdRafnDHWPme-ZciP4MjixeBsDqIhuzdBjUBE52uUg0KYIZmWUbWX29CjRf__-WI7ah2QPMqXFMCXvzWPgs7uiXOGj8eFfC7R7xNipBieR_1BPdAtsfNnLRZSb8_b3Rc-ikaCXNUR0LD15QidNRlENcVZnbsktPTl9mc2klV6qSiEwWBZ0-tDwOUwI5Q7cNRKN2abhv4LKzwpvAe4P-7_owlO5NVIk4_Ss" alt="Federal contract monitoring dashboard"/>
+        <div class="aspect-square bg-primary-container rounded-xl overflow-hidden shadow-2xl rotate-3 relative z-10" role="img" aria-label="Federal contract monitoring dashboard">
+            <div class="absolute inset-0 opacity-30" style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 28px 28px;"></div>
+            <div class="absolute inset-0 flex flex-col justify-center gap-4 px-10">
+                <div class="h-3 rounded-full bg-white/20 w-3/4"></div>
+                <div class="h-3 rounded-full bg-white/15 w-full"></div>
+                <div class="h-3 rounded-full bg-white/15 w-5/6"></div>
+                <div class="h-24 rounded-lg bg-white/10 border border-white/10 mt-4 flex items-end gap-2 p-3">
+                    <div class="w-1/6 bg-secondary-container/70 rounded-sm" style="height:40%"></div>
+                    <div class="w-1/6 bg-secondary-container/70 rounded-sm" style="height:70%"></div>
+                    <div class="w-1/6 bg-secondary-container/70 rounded-sm" style="height:55%"></div>
+                    <div class="w-1/6 bg-secondary-container rounded-sm" style="height:90%"></div>
+                    <div class="w-1/6 bg-secondary-container/70 rounded-sm" style="height:65%"></div>
+                    <div class="w-1/6 bg-secondary-container/70 rounded-sm" style="height:80%"></div>
+                </div>
+            </div>
             <div class="absolute inset-0 bg-gradient-to-t from-primary-container/80 to-transparent"></div>
             <div class="absolute bottom-6 left-6 right-6 p-4 bg-white/10 backdrop-blur-xl rounded-lg border border-white/20">
                 <div class="flex justify-between items-center mb-2">
@@ -269,9 +292,9 @@
         <!-- Billing toggle -->
         <div class="inline-flex items-center gap-4 mt-8 bg-surface-container-low rounded-full px-6 py-3 border border-outline-variant/30">
             <span id="label-mensal" class="font-label text-sm font-semibold text-on-surface">Monthly</span>
-            <button id="billing-toggle" onclick="toggleBilling()"
+            <button id="billing-toggle" onclick="toggleBilling()" type="button"
                 class="relative w-12 h-6 rounded-full transition-colors duration-300 bg-outline-variant focus:outline-none"
-                aria-pressed="false" role="switch">
+                aria-checked="false" aria-label="Toggle annual billing" role="switch">
                 <span id="toggle-dot" class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300"></span>
             </button>
             <span id="label-anual" class="font-label text-sm font-medium text-on-surface-variant flex items-center gap-2">
@@ -435,6 +458,7 @@
     </form>
 </div>
 </section>
+</main>
 
 <!-- Footer -->
 <footer class="bg-slate-950 text-white w-full py-12 px-6 border-t border-slate-800">
@@ -444,7 +468,7 @@
         <p class="font-body text-sm font-light text-slate-400 leading-relaxed">AI-powered market intelligence for US federal procurement. Empowering businesses to win government contracts.</p>
     </div>
     <div>
-        <h4 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-white/40">Product</h4>
+        <h3 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-slate-400">Product</h3>
         <ul class="space-y-4 font-body text-sm font-light">
             <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="#how">How it Works</a></li>
             <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="#planos">Pricing</a></li>
@@ -452,7 +476,7 @@
         </ul>
     </div>
     <div>
-        <h4 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-white/40">Account</h4>
+        <h3 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-slate-400">Account</h3>
         <ul class="space-y-4 font-body text-sm font-light">
             <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/signup">Create Account</a></li>
             <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="/login">Sign In</a></li>
@@ -460,14 +484,14 @@
         </ul>
     </div>
     <div>
-        <h4 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-white/40">Contact</h4>
+        <h3 class="font-headline font-bold text-sm mb-6 uppercase tracking-widest text-slate-400">Contact</h3>
         <ul class="space-y-4 font-body text-sm font-light">
             <li><a class="text-slate-400 hover:text-white transition-colors inline-block" href="#newsletter">Newsletter</a></li>
         </ul>
     </div>
 </div>
 <div class="max-w-7xl mx-auto mt-16 pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
-    <p class="font-body text-sm font-light text-slate-500">© 2026 TenderSentinel. US Federal Procurement Intelligence. All rights reserved.</p>
+    <p class="font-body text-sm font-light text-slate-400">© 2026 TenderSentinel. US Federal Procurement Intelligence. All rights reserved.</p>
 </div>
 </footer>
 
@@ -531,7 +555,7 @@ function toggleBilling() {
 
     if (billingAnual) {
         btn.classList.replace('bg-outline-variant', 'bg-secondary');
-        btn.setAttribute('aria-pressed', 'true');
+        btn.setAttribute('aria-checked', 'true');
         dot.style.transform = 'translateX(24px)';
         badge.classList.remove('hidden');
         labelAnual.classList.replace('text-on-surface-variant', 'text-on-surface');
@@ -541,7 +565,7 @@ function toggleBilling() {
         grid.dataset.period = 'annual';
     } else {
         btn.classList.replace('bg-secondary', 'bg-outline-variant');
-        btn.setAttribute('aria-pressed', 'false');
+        btn.setAttribute('aria-checked', 'false');
         dot.style.transform = 'translateX(0)';
         badge.classList.add('hidden');
         labelMensal.classList.replace('text-on-surface-variant', 'text-on-surface');

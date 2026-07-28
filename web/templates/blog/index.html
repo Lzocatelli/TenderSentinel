@@ -29,7 +29,7 @@
             <a href="/blog/{{ post.slug }}" class="group bg-white rounded-xl border border-outline-variant/20 overflow-hidden hover:shadow-lg hover:border-outline-variant/50 transition-all flex flex-col">
                 {% if post.thumbnail %}
                 <div class="aspect-video overflow-hidden bg-surface-container">
-                    <img src="{{ post.thumbnail }}" alt="{{ post.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                    <img src="{{ post.thumbnail }}" alt="{{ post.title }}" width="1600" height="1067" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
                 </div>
                 {% else %}
                 <div class="aspect-video bg-primary flex items-center justify-center">

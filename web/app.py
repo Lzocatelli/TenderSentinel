@@ -18,7 +18,7 @@ import stripe
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from flask import (Flask, Response, abort, flash, jsonify, redirect,
-                   render_template, request, session, url_for)
+                   render_template, request, send_from_directory, session, url_for)
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import (LoginManager, UserMixin, current_user, login_required,
@@ -288,6 +288,11 @@ _search_lock = threading.Lock()
 @app.route("/")
 def index():
     return render_template("index.html", total_hoje=count_opportunities_today())
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(app.static_folder, "favicon.ico", mimetype="image/vnd.microsoft.icon")
 
 
 @app.route("/api/contador")
