@@ -6,3 +6,5 @@ CLAUDE.md
 tendersentinel_linkedin_posts.docx
 TENDERSENTINEL_IMPLEMENTATION
 node_modules/
+# Local Python virtualenv used for testing
+.venv/
