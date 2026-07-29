@@ -80,10 +80,12 @@
 
     /* Live procurement activity map */
     .map-dot {
-        cursor: pointer;
         transition: all 0.3s ease;
     }
-    .map-dot:hover {
+    .map-dot-hit {
+        cursor: pointer;
+    }
+    .map-dot-group.dot-active .map-dot {
         transform: scale(1.5);
         filter: drop-shadow(0 0 8px #fc7218);
     }
@@ -93,7 +95,7 @@
         transition: opacity 0.2s ease-in-out;
         pointer-events: none;
     }
-    .map-dot:hover + .tooltip {
+    .tooltip.tooltip-visible {
         visibility: visible;
         opacity: 1;
     }
@@ -190,39 +192,44 @@
         <h2 class="font-headline text-3xl font-extrabold tracking-tight mb-3">See it happening live.</h2>
         <p class="text-on-surface-variant text-lg max-w-2xl mx-auto">A snapshot of federal opportunities being scored and matched across the country right now.</p>
     </div>
-    <div class="relative w-full aspect-[1.8/1] max-w-4xl mx-auto overflow-hidden rounded-xl bg-white border border-outline-variant/20 shadow-lg reveal reveal-delay-1">
+    <div class="relative w-full aspect-[1.8/1] max-w-4xl mx-auto overflow-hidden rounded-xl bg-white border border-outline-variant/20 shadow-lg reveal reveal-delay-1" style="background-image: radial-gradient(circle at 1px 1px, #dce9ff 1.5px, transparent 0); background-size: 24px 24px;">
         <div class="relative z-10 w-full h-full flex items-center justify-center p-10">
-            <svg class="w-full h-full text-primary-container/10 fill-current" viewbox="0 0 1000 600">
-                <path d="M200,200 Q250,100 400,150 T600,120 T850,200 L900,400 Q800,500 600,450 T300,480 T150,350 Z" fill="none" stroke="currentColor" stroke-width="2"></path>
-                <g class="map-dot-group">
-                    <circle class="map-dot fill-secondary-container" cx="350" cy="280" r="6"></circle>
-                    <foreignobject class="tooltip" height="90" width="210" x="360" y="230">
-                        <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
-                            <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">Live Update</p>
-                            <p class="font-body text-xs font-bold">NAICS 541512 &mdash; Texas</p>
-                            <p class="font-body text-[10px] text-white/70">Set-aside: SDVOSB</p>
-                        </div>
-                    </foreignobject>
-                </g>
-                <g class="map-dot-group">
-                    <circle class="map-dot fill-secondary-container" cx="650" cy="320" r="6"></circle>
-                    <foreignobject class="tooltip" height="90" width="210" x="660" y="270">
-                        <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
-                            <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">New Match</p>
-                            <p class="font-body text-xs font-bold">NAICS 541330 &mdash; Virginia</p>
-                            <p class="font-body text-[10px] text-white/70">Set-aside: WOSB</p>
-                        </div>
-                    </foreignobject>
-                </g>
-                <g class="map-dot-group">
-                    <circle class="map-dot fill-secondary-container" cx="500" cy="220" r="6"></circle>
-                    <foreignobject class="tooltip" height="90" width="210" x="510" y="120">
-                        <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
-                            <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">Urgent</p>
-                            <p class="font-body text-xs font-bold">NAICS 541611 &mdash; D.C.</p>
-                            <p class="font-body text-[10px] text-white/70">Set-aside: 8(a)</p>
-                        </div>
-                    </foreignobject>
+            <svg id="live-map-svg" class="w-full h-full" viewbox="0 0 1000 600">
+                <g id="live-map-dots">
+                    <!-- Fallback dots shown until /api/live-map responds; replaced with real data by JS below -->
+                    <g class="map-dot-group">
+                        <circle class="map-dot-hit" cx="350" cy="280" r="16" fill="transparent"></circle>
+                        <circle class="map-dot fill-secondary-container" cx="350" cy="280" r="6"></circle>
+                        <foreignobject class="tooltip" height="90" width="210" x="360" y="230">
+                            <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
+                                <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">Live Update</p>
+                                <p class="font-body text-xs font-bold">NAICS 541512 &mdash; Texas</p>
+                                <p class="font-body text-[10px] text-white/70">Set-aside: SDVOSB</p>
+                            </div>
+                        </foreignobject>
+                    </g>
+                    <g class="map-dot-group">
+                        <circle class="map-dot-hit" cx="650" cy="320" r="16" fill="transparent"></circle>
+                        <circle class="map-dot fill-secondary-container" cx="650" cy="320" r="6"></circle>
+                        <foreignobject class="tooltip" height="90" width="210" x="660" y="270">
+                            <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
+                                <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">New Match</p>
+                                <p class="font-body text-xs font-bold">NAICS 541330 &mdash; Virginia</p>
+                                <p class="font-body text-[10px] text-white/70">Set-aside: WOSB</p>
+                            </div>
+                        </foreignobject>
+                    </g>
+                    <g class="map-dot-group">
+                        <circle class="map-dot-hit" cx="500" cy="220" r="16" fill="transparent"></circle>
+                        <circle class="map-dot fill-secondary-container" cx="500" cy="220" r="6"></circle>
+                        <foreignobject class="tooltip" height="90" width="210" x="510" y="120">
+                            <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
+                                <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">Urgent</p>
+                                <p class="font-body text-xs font-bold">NAICS 541611 &mdash; D.C.</p>
+                                <p class="font-body text-[10px] text-white/70">Set-aside: 8(a)</p>
+                            </div>
+                        </foreignobject>
+                    </g>
                 </g>
             </svg>
         </div>
@@ -617,6 +624,107 @@ async function updateCounter() {
 }
 updateCounter();
 setInterval(updateCounter, 5 * 60 * 1000);
+
+// Live procurement activity map — approximate positions on the illustrative
+// US shape, not precise cartography.
+const STATE_INFO = {
+    AL: ["Alabama", 610, 350], AK: ["Alaska", 190, 470], AZ: ["Arizona", 270, 340],
+    AR: ["Arkansas", 520, 320], CA: ["California", 170, 290], CO: ["Colorado", 350, 260],
+    CT: ["Connecticut", 780, 170], DE: ["Delaware", 740, 210], DC: ["D.C.", 725, 225],
+    FL: ["Florida", 680, 440], GA: ["Georgia", 650, 370], HI: ["Hawaii", 260, 470],
+    ID: ["Idaho", 280, 180], IL: ["Illinois", 570, 220], IN: ["Indiana", 610, 220],
+    IA: ["Iowa", 510, 200], KS: ["Kansas", 440, 270], KY: ["Kentucky", 620, 250],
+    LA: ["Louisiana", 520, 380], ME: ["Maine", 810, 90], MD: ["Maryland", 730, 220],
+    MA: ["Massachusetts", 790, 150], MI: ["Michigan", 620, 150], MN: ["Minnesota", 500, 130],
+    MS: ["Mississippi", 570, 360], MO: ["Missouri", 520, 260], MT: ["Montana", 330, 120],
+    NE: ["Nebraska", 440, 220], NV: ["Nevada", 230, 250], NH: ["New Hampshire", 780, 120],
+    NJ: ["New Jersey", 750, 190], NM: ["New Mexico", 340, 340], NY: ["New York", 740, 150],
+    NC: ["North Carolina", 690, 280], ND: ["North Dakota", 430, 110], OH: ["Ohio", 660, 220],
+    OK: ["Oklahoma", 460, 320], OR: ["Oregon", 190, 190], PA: ["Pennsylvania", 720, 210],
+    RI: ["Rhode Island", 800, 160], SC: ["South Carolina", 680, 320], SD: ["South Dakota", 430, 170],
+    TN: ["Tennessee", 610, 290], TX: ["Texas", 430, 400], UT: ["Utah", 280, 260],
+    VT: ["Vermont", 760, 120], VA: ["Virginia", 700, 250], WA: ["Washington", 200, 130],
+    WV: ["West Virginia", 670, 240], WI: ["Wisconsin", 560, 150], WY: ["Wyoming", 320, 200],
+};
+const SET_ASIDE_LABELS = {
+    SBA: "Small Business", "8A": "8(a)", HZC: "HUBZone", WOSB: "WOSB",
+    EDWOSB: "EDWOSB", SDVOSB: "SDVOSB", VSB: "VOSB",
+};
+function daysAgoLabel(isoDate) {
+    if (!isoDate) return "Recently";
+    const days = Math.floor((Date.now() - new Date(isoDate)) / 86400000);
+    if (days <= 0) return "Today";
+    if (days === 1) return "1 day ago";
+    return `${days} days ago`;
+}
+const SVG_NS = 'http://www.w3.org/2000/svg';
+async function updateLiveMap() {
+    try {
+        const r = await fetch('/api/live-map');
+        const items = (await r.json()).filter(it => STATE_INFO[it.state]);
+        if (!items.length) return;
+
+        const container = document.getElementById('live-map-dots');
+        container.innerHTML = '';
+        items.slice(0, 6).forEach(it => {
+            const [stateName, cx, cy] = STATE_INFO[it.state];
+            const g = document.createElementNS(SVG_NS, 'g');
+            g.setAttribute('class', 'map-dot-group');
+
+            const hitArea = document.createElementNS(SVG_NS, 'circle');
+            hitArea.setAttribute('class', 'map-dot-hit');
+            hitArea.setAttribute('cx', cx);
+            hitArea.setAttribute('cy', cy);
+            hitArea.setAttribute('r', 16);
+            hitArea.setAttribute('fill', 'transparent');
+
+            const circle = document.createElementNS(SVG_NS, 'circle');
+            circle.setAttribute('class', 'map-dot fill-secondary-container');
+            circle.setAttribute('cx', cx);
+            circle.setAttribute('cy', cy);
+            circle.setAttribute('r', 6);
+
+            const fo = document.createElementNS(SVG_NS, 'foreignObject');
+            fo.setAttribute('class', 'tooltip');
+            fo.setAttribute('width', 210);
+            fo.setAttribute('height', 90);
+            fo.setAttribute('x', Math.min(cx + 10, 790));
+            fo.setAttribute('y', Math.max(cy - 50, 10));
+
+            const setAsideLabel = SET_ASIDE_LABELS[it.set_aside] || it.set_aside;
+            fo.innerHTML = `
+                <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
+                    <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">${daysAgoLabel(it.posted_date)}</p>
+                    <p class="font-body text-xs font-bold">NAICS ${it.naics_code} &mdash; ${stateName}</p>
+                    <p class="font-body text-[10px] text-white/70">${setAsideLabel ? 'Set-aside: ' + setAsideLabel : it.agency}</p>
+                </div>`;
+
+            g.appendChild(hitArea);
+            g.appendChild(circle);
+            g.appendChild(fo);
+            container.appendChild(g);
+        });
+        bindMapTooltips();
+    } catch (e) {}
+}
+function bindMapTooltips() {
+    document.querySelectorAll('.map-dot-group').forEach(group => {
+        if (group.dataset.tooltipBound) return;
+        group.dataset.tooltipBound = 'true';
+        const tooltip = group.querySelector('.tooltip');
+        group.addEventListener('mouseenter', () => {
+            group.classList.add('dot-active');
+            tooltip.classList.add('tooltip-visible');
+        });
+        group.addEventListener('mouseleave', () => {
+            group.classList.remove('dot-active');
+            tooltip.classList.remove('tooltip-visible');
+        });
+    });
+}
+bindMapTooltips();
+updateLiveMap();
+setInterval(updateLiveMap, 5 * 60 * 1000);
 
 // Billing toggle
 let billingAnual = false;
