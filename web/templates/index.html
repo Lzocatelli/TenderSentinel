@@ -79,8 +79,21 @@
     html { scroll-behavior: smooth; }
 
     /* Live procurement activity map */
+    .us-state {
+        fill: #eff4ff;
+        stroke: #cbdbf5;
+        stroke-width: 1;
+        stroke-linejoin: round;
+        transition: fill 0.3s ease;
+    }
+    .us-state.state-has-activity {
+        fill: #dce9ff;
+    }
     .map-dot {
         transition: all 0.3s ease;
+        /* The visible dot sits on top of its hit circle; let pointer events
+           through so the larger target always wins. */
+        pointer-events: none;
     }
     .map-dot-hit {
         cursor: pointer;
@@ -192,15 +205,17 @@
         <h2 class="font-headline text-3xl font-extrabold tracking-tight mb-3">See it happening live.</h2>
         <p class="text-on-surface-variant text-lg max-w-2xl mx-auto">A snapshot of federal opportunities being scored and matched across the country right now.</p>
     </div>
-    <div class="relative w-full aspect-[1.8/1] max-w-4xl mx-auto overflow-hidden rounded-xl bg-white border border-outline-variant/20 shadow-lg reveal reveal-delay-1" style="background-image: radial-gradient(circle at 1px 1px, #dce9ff 1.5px, transparent 0); background-size: 24px 24px;">
-        <div class="relative z-10 w-full h-full flex items-center justify-center p-10">
-            <svg id="live-map-svg" class="w-full h-full" viewbox="0 0 1000 600">
+    <div class="relative w-full aspect-[1.8/1] max-w-4xl mx-auto overflow-hidden rounded-xl bg-white border border-outline-variant/20 shadow-lg reveal reveal-delay-1">
+        <div class="relative z-10 w-full h-full flex items-center justify-center p-2 sm:p-6 md:p-10">
+            <svg id="live-map-svg" class="w-full h-full" viewbox="0 0 1000 600" role="img" aria-label="Map of the United States showing where recent federal opportunities were posted">
+                {% include "partials/_us_map_states.html" %}
                 <g id="live-map-dots">
-                    <!-- Fallback dots shown until /api/live-map responds; replaced with real data by JS below -->
+                    <!-- Fallback dots shown until /api/live-map responds; replaced with real data by JS below.
+                         Coordinates are the generated state centroids for TX / VA / DC. -->
                     <g class="map-dot-group">
-                        <circle class="map-dot-hit" cx="350" cy="280" r="16" fill="transparent"></circle>
-                        <circle class="map-dot fill-secondary-container" cx="350" cy="280" r="6"></circle>
-                        <foreignobject class="tooltip" height="90" width="210" x="360" y="230">
+                        <circle class="map-dot-hit" cx="485.1" cy="453.8" r="28" fill="transparent"></circle>
+                        <circle class="map-dot fill-secondary-container" cx="485.1" cy="453.8" r="6"></circle>
+                        <foreignobject class="tooltip" height="90" width="210" x="495.1" y="403.8">
                             <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
                                 <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">Live Update</p>
                                 <p class="font-body text-xs font-bold">NAICS 541512 &mdash; Texas</p>
@@ -209,9 +224,9 @@
                         </foreignobject>
                     </g>
                     <g class="map-dot-group">
-                        <circle class="map-dot-hit" cx="650" cy="320" r="16" fill="transparent"></circle>
-                        <circle class="map-dot fill-secondary-container" cx="650" cy="320" r="6"></circle>
-                        <foreignobject class="tooltip" height="90" width="210" x="660" y="270">
+                        <circle class="map-dot-hit" cx="839" cy="295.2" r="28" fill="transparent"></circle>
+                        <circle class="map-dot fill-secondary-container" cx="839" cy="295.2" r="6"></circle>
+                        <foreignobject class="tooltip" height="90" width="210" x="620" y="245.2">
                             <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
                                 <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">New Match</p>
                                 <p class="font-body text-xs font-bold">NAICS 541330 &mdash; Virginia</p>
@@ -220,9 +235,9 @@
                         </foreignobject>
                     </g>
                     <g class="map-dot-group">
-                        <circle class="map-dot-hit" cx="500" cy="220" r="16" fill="transparent"></circle>
-                        <circle class="map-dot fill-secondary-container" cx="500" cy="220" r="6"></circle>
-                        <foreignobject class="tooltip" height="90" width="210" x="510" y="120">
+                        <circle class="map-dot-hit" cx="862.8" cy="260.4" r="28" fill="transparent"></circle>
+                        <circle class="map-dot fill-secondary-container" cx="862.8" cy="260.4" r="6"></circle>
+                        <foreignobject class="tooltip" height="90" width="210" x="643" y="185">
                             <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
                                 <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">Urgent</p>
                                 <p class="font-body text-xs font-bold">NAICS 541611 &mdash; D.C.</p>
@@ -233,9 +248,12 @@
                 </g>
             </svg>
         </div>
-        <div class="absolute bottom-5 left-5 z-20 flex items-center gap-2 bg-white/90 backdrop-blur px-4 py-2 rounded-full border border-outline-variant/20 shadow-sm">
-            <span class="material-symbols-outlined text-primary-container text-base">map</span>
-            <span class="font-label text-xs font-semibold text-primary-container">Live Procurement Activity Map</span>
+        {% include "partials/_us_state_centroids.html" %}
+        <!-- Bottom-right: the only corner Albers USA leaves empty (Alaska and
+             Hawaii sit bottom-left, New England top-right). -->
+        <div class="absolute bottom-4 right-4 z-20 hidden sm:flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full border border-outline-variant/20 shadow-sm">
+            <span class="material-symbols-outlined text-primary-container text-base" aria-hidden="true">map</span>
+            <span class="font-label text-[11px] font-semibold text-primary-container">Live Procurement Activity Map</span>
         </div>
     </div>
 </div>
@@ -625,27 +643,20 @@ async function updateCounter() {
 updateCounter();
 setInterval(updateCounter, 5 * 60 * 1000);
 
-// Live procurement activity map — approximate positions on the illustrative
-// US shape, not precise cartography.
-const STATE_INFO = {
-    AL: ["Alabama", 610, 350], AK: ["Alaska", 190, 470], AZ: ["Arizona", 270, 340],
-    AR: ["Arkansas", 520, 320], CA: ["California", 170, 290], CO: ["Colorado", 350, 260],
-    CT: ["Connecticut", 780, 170], DE: ["Delaware", 740, 210], DC: ["D.C.", 725, 225],
-    FL: ["Florida", 680, 440], GA: ["Georgia", 650, 370], HI: ["Hawaii", 260, 470],
-    ID: ["Idaho", 280, 180], IL: ["Illinois", 570, 220], IN: ["Indiana", 610, 220],
-    IA: ["Iowa", 510, 200], KS: ["Kansas", 440, 270], KY: ["Kentucky", 620, 250],
-    LA: ["Louisiana", 520, 380], ME: ["Maine", 810, 90], MD: ["Maryland", 730, 220],
-    MA: ["Massachusetts", 790, 150], MI: ["Michigan", 620, 150], MN: ["Minnesota", 500, 130],
-    MS: ["Mississippi", 570, 360], MO: ["Missouri", 520, 260], MT: ["Montana", 330, 120],
-    NE: ["Nebraska", 440, 220], NV: ["Nevada", 230, 250], NH: ["New Hampshire", 780, 120],
-    NJ: ["New Jersey", 750, 190], NM: ["New Mexico", 340, 340], NY: ["New York", 740, 150],
-    NC: ["North Carolina", 690, 280], ND: ["North Dakota", 430, 110], OH: ["Ohio", 660, 220],
-    OK: ["Oklahoma", 460, 320], OR: ["Oregon", 190, 190], PA: ["Pennsylvania", 720, 210],
-    RI: ["Rhode Island", 800, 160], SC: ["South Carolina", 680, 320], SD: ["South Dakota", 430, 170],
-    TN: ["Tennessee", 610, 290], TX: ["Texas", 430, 400], UT: ["Utah", 280, 260],
-    VT: ["Vermont", 760, 120], VA: ["Virginia", 700, 250], WA: ["Washington", 200, 130],
-    WV: ["West Virginia", 670, 240], WI: ["Wisconsin", 560, 150], WY: ["Wyoming", 320, 200],
-};
+// Live procurement activity map. Dot positions come from the projected state
+// centroids generated alongside the map SVG (npm run build:map), so they line up
+// with the real geometry instead of being hand-placed.
+const STATE_INFO = (() => {
+    try {
+        const raw = JSON.parse(document.getElementById('us-state-centroids').textContent);
+        // Stored as [x, y, name]; reorder to [name, x, y] for readability below.
+        return Object.fromEntries(
+            Object.entries(raw).map(([code, [x, y, name]]) => [code, [name, x, y]])
+        );
+    } catch (e) {
+        return {};
+    }
+})();
 const SET_ASIDE_LABELS = {
     SBA: "Small Business", "8A": "8(a)", HZC: "HUBZone", WOSB: "WOSB",
     EDWOSB: "EDWOSB", SDVOSB: "SDVOSB", VSB: "VOSB",
@@ -658,6 +669,15 @@ function daysAgoLabel(isoDate) {
     return `${days} days ago`;
 }
 const SVG_NS = 'http://www.w3.org/2000/svg';
+// Hit-target radius in viewBox units. The map scales down a lot on narrow
+// screens, so grow the (invisible) target there to keep tapping practical
+// without making the visible dots bigger.
+function hitRadius() {
+    const svg = document.getElementById('live-map-svg');
+    const scale = svg && svg.clientWidth ? svg.clientWidth / 1000 : 1;
+    // Aim for a ~22px on-screen radius, but never let dots swallow the map.
+    return Math.min(Math.max(22 / scale, 28), 70);
+}
 async function updateLiveMap() {
     try {
         const r = await fetch('/api/live-map');
@@ -666,8 +686,16 @@ async function updateLiveMap() {
 
         const container = document.getElementById('live-map-dots');
         container.innerHTML = '';
+        document.querySelectorAll('.us-state.state-has-activity')
+            .forEach(el => el.classList.remove('state-has-activity'));
+
+        const HIT_RADIUS = hitRadius();
         items.slice(0, 6).forEach(it => {
             const [stateName, cx, cy] = STATE_INFO[it.state];
+
+            const statePath = document.querySelector(`.us-state[data-state="${it.state}"]`);
+            if (statePath) statePath.classList.add('state-has-activity');
+
             const g = document.createElementNS(SVG_NS, 'g');
             g.setAttribute('class', 'map-dot-group');
 
@@ -675,7 +703,7 @@ async function updateLiveMap() {
             hitArea.setAttribute('class', 'map-dot-hit');
             hitArea.setAttribute('cx', cx);
             hitArea.setAttribute('cy', cy);
-            hitArea.setAttribute('r', 16);
+            hitArea.setAttribute('r', HIT_RADIUS);
             hitArea.setAttribute('fill', 'transparent');
 
             const circle = document.createElementNS(SVG_NS, 'circle');
@@ -684,12 +712,16 @@ async function updateLiveMap() {
             circle.setAttribute('cy', cy);
             circle.setAttribute('r', 6);
 
+            const TOOLTIP_W = 210, TOOLTIP_H = 90;
             const fo = document.createElementNS(SVG_NS, 'foreignObject');
             fo.setAttribute('class', 'tooltip');
-            fo.setAttribute('width', 210);
-            fo.setAttribute('height', 90);
-            fo.setAttribute('x', Math.min(cx + 10, 790));
-            fo.setAttribute('y', Math.max(cy - 50, 10));
+            fo.setAttribute('width', TOOLTIP_W);
+            fo.setAttribute('height', TOOLTIP_H);
+            // Flip to the left of the dot near the right edge (east coast states)
+            // so the tooltip never gets clipped by the viewBox.
+            const flip = cx + 10 + TOOLTIP_W > 1000;
+            fo.setAttribute('x', flip ? Math.max(cx - 10 - TOOLTIP_W, 0) : cx + 10);
+            fo.setAttribute('y', Math.min(Math.max(cy - 50, 0), 600 - TOOLTIP_H));
 
             const setAsideLabel = SET_ASIDE_LABELS[it.set_aside] || it.set_aside;
             fo.innerHTML = `
@@ -707,21 +739,32 @@ async function updateLiveMap() {
         bindMapTooltips();
     } catch (e) {}
 }
+function showMapTooltip(group, show) {
+    group.classList.toggle('dot-active', show);
+    group.querySelector('.tooltip').classList.toggle('tooltip-visible', show);
+}
+function closeAllMapTooltips() {
+    document.querySelectorAll('.map-dot-group').forEach(g => showMapTooltip(g, false));
+}
 function bindMapTooltips() {
     document.querySelectorAll('.map-dot-group').forEach(group => {
         if (group.dataset.tooltipBound) return;
         group.dataset.tooltipBound = 'true';
-        const tooltip = group.querySelector('.tooltip');
-        group.addEventListener('mouseenter', () => {
-            group.classList.add('dot-active');
-            tooltip.classList.add('tooltip-visible');
-        });
-        group.addEventListener('mouseleave', () => {
-            group.classList.remove('dot-active');
-            tooltip.classList.remove('tooltip-visible');
+        group.addEventListener('mouseenter', () => showMapTooltip(group, true));
+        group.addEventListener('mouseleave', () => showMapTooltip(group, false));
+        // Touch devices have no real hover. Tapping opens this tooltip (and only
+        // this one); tapping outside closes it. This deliberately always opens
+        // rather than toggling, because a tap on touch is preceded by an
+        // emulated mouseenter — a toggle would immediately close it again.
+        group.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeAllMapTooltips();
+            showMapTooltip(group, true);
         });
     });
 }
+// Tapping anywhere else dismisses an open tooltip.
+document.addEventListener('click', closeAllMapTooltips);
 bindMapTooltips();
 updateLiveMap();
 setInterval(updateLiveMap, 5 * 60 * 1000);
