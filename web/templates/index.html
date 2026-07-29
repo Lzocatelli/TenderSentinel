@@ -77,6 +77,26 @@
     #contador.bump { transform: scale(1.08); color: #fc7218; }
 
     html { scroll-behavior: smooth; }
+
+    /* Live procurement activity map */
+    .map-dot {
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .map-dot:hover {
+        transform: scale(1.5);
+        filter: drop-shadow(0 0 8px #fc7218);
+    }
+    .tooltip {
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+        pointer-events: none;
+    }
+    .map-dot:hover + .tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
 </style>
 </head>
 <body class="bg-surface text-on-surface font-body selection:bg-secondary-container selection:text-on-secondary-container">
@@ -127,32 +147,89 @@
         </div>
     </div>
     <div class="lg:col-span-5 relative">
-        <div class="aspect-square bg-primary-container rounded-xl overflow-hidden shadow-2xl rotate-3 relative z-10" role="img" aria-label="Federal contract monitoring dashboard">
-            <div class="absolute inset-0 opacity-30" style="background-image: radial-gradient(circle at 2px 2px, white 1px, transparent 0); background-size: 28px 28px;"></div>
-            <div class="absolute inset-0 flex flex-col justify-center gap-4 px-10">
-                <div class="h-3 rounded-full bg-white/20 w-3/4"></div>
-                <div class="h-3 rounded-full bg-white/15 w-full"></div>
-                <div class="h-3 rounded-full bg-white/15 w-5/6"></div>
-                <div class="h-24 rounded-lg bg-white/10 border border-white/10 mt-4 flex items-end gap-2 p-3">
-                    <div class="w-1/6 bg-secondary-container/70 rounded-sm" style="height:40%"></div>
-                    <div class="w-1/6 bg-secondary-container/70 rounded-sm" style="height:70%"></div>
-                    <div class="w-1/6 bg-secondary-container/70 rounded-sm" style="height:55%"></div>
-                    <div class="w-1/6 bg-secondary-container rounded-sm" style="height:90%"></div>
-                    <div class="w-1/6 bg-secondary-container/70 rounded-sm" style="height:65%"></div>
-                    <div class="w-1/6 bg-secondary-container/70 rounded-sm" style="height:80%"></div>
+        <div class="bg-primary-container rounded-xl overflow-hidden shadow-2xl rotate-3 hover:rotate-0 relative z-10 transition-transform duration-500 border border-white/10" role="img" aria-label="Federal contract monitoring dashboard preview">
+            <div class="p-6 flex flex-col gap-5">
+                <div class="flex items-center gap-2">
+                    <span class="pulse-dot"></span>
+                    <span class="font-label text-[10px] uppercase tracking-widest text-white/60">Live Monitoring Active</span>
                 </div>
-            </div>
-            <div class="absolute inset-0 bg-gradient-to-t from-primary-container/80 to-transparent"></div>
-            <div class="absolute bottom-6 left-6 right-6 p-4 bg-white/10 backdrop-blur-xl rounded-lg border border-white/20">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="font-label text-[10px] text-white/60 uppercase">Recent Match</span>
-                    <span class="text-secondary-container font-label text-[10px] font-bold">98% Fit</span>
+                <div>
+                    <div class="text-white font-headline font-bold text-xl mb-1">Hello, Alex</div>
+                    <div class="text-white/50 text-xs font-label">Plan: Free &middot; 1 keyword</div>
                 </div>
-                <div class="text-white font-headline font-bold text-sm">DoD Infrastructure Modernization - Phase IV</div>
+                <div class="bg-white/10 border border-white/10 rounded-lg p-3 flex items-center justify-between gap-3">
+                    <span class="text-white/80 text-xs font-body">You're on the free plan</span>
+                    <span class="bg-secondary-container text-white text-[10px] font-label font-bold px-3 py-1.5 rounded whitespace-nowrap">View plans</span>
+                </div>
+                <div class="flex gap-2">
+                    <span class="bg-white/10 text-white/80 text-[10px] font-label px-2.5 py-1 rounded-full uppercase tracking-wider">IT</span>
+                    <span class="bg-secondary-container/20 text-secondary-container text-[10px] font-label px-2.5 py-1 rounded-full uppercase tracking-wider">SDVOSB</span>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4 border border-white/10">
+                    <div class="text-white font-headline text-xs font-bold mb-3">Matching Opportunities</div>
+                    <div class="flex justify-between text-[9px] text-white/40 font-label uppercase tracking-wider mb-2 pb-2 border-b border-white/10">
+                        <span>Agency / Title</span><span>Posted</span>
+                    </div>
+                    <div class="flex justify-between items-center gap-3">
+                        <span class="text-white/80 text-[11px] font-body leading-snug">Dept of Defense &mdash; Circuit Card Assembly</span>
+                        <span class="text-secondary-container text-[10px] font-label font-bold shrink-0">View</span>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="absolute -top-12 -right-12 w-64 h-64 bg-secondary/10 rounded-full blur-3xl"></div>
         <div class="absolute -bottom-12 -left-12 w-48 h-48 bg-on-tertiary-container/20 rounded-full blur-3xl"></div>
+    </div>
+</div>
+</section>
+
+<!-- Live Procurement Activity Map -->
+<section class="py-16 bg-surface-container-low border-y border-outline-variant/10">
+<div class="max-w-5xl mx-auto px-6">
+    <div class="text-center mb-10 reveal">
+        <h2 class="font-headline text-3xl font-extrabold tracking-tight mb-3">See it happening live.</h2>
+        <p class="text-on-surface-variant text-lg max-w-2xl mx-auto">A snapshot of federal opportunities being scored and matched across the country right now.</p>
+    </div>
+    <div class="relative w-full aspect-[1.8/1] max-w-4xl mx-auto overflow-hidden rounded-xl bg-white border border-outline-variant/20 shadow-lg reveal reveal-delay-1">
+        <div class="relative z-10 w-full h-full flex items-center justify-center p-10">
+            <svg class="w-full h-full text-primary-container/10 fill-current" viewbox="0 0 1000 600">
+                <path d="M200,200 Q250,100 400,150 T600,120 T850,200 L900,400 Q800,500 600,450 T300,480 T150,350 Z" fill="none" stroke="currentColor" stroke-width="2"></path>
+                <g class="map-dot-group">
+                    <circle class="map-dot fill-secondary-container" cx="350" cy="280" r="6"></circle>
+                    <foreignobject class="tooltip" height="90" width="210" x="360" y="230">
+                        <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
+                            <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">Live Update</p>
+                            <p class="font-body text-xs font-bold">NAICS 541512 &mdash; Texas</p>
+                            <p class="font-body text-[10px] text-white/70">Set-aside: SDVOSB</p>
+                        </div>
+                    </foreignobject>
+                </g>
+                <g class="map-dot-group">
+                    <circle class="map-dot fill-secondary-container" cx="650" cy="320" r="6"></circle>
+                    <foreignobject class="tooltip" height="90" width="210" x="660" y="270">
+                        <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
+                            <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">New Match</p>
+                            <p class="font-body text-xs font-bold">NAICS 541330 &mdash; Virginia</p>
+                            <p class="font-body text-[10px] text-white/70">Set-aside: WOSB</p>
+                        </div>
+                    </foreignobject>
+                </g>
+                <g class="map-dot-group">
+                    <circle class="map-dot fill-secondary-container" cx="500" cy="220" r="6"></circle>
+                    <foreignobject class="tooltip" height="90" width="210" x="510" y="120">
+                        <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
+                            <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">Urgent</p>
+                            <p class="font-body text-xs font-bold">NAICS 541611 &mdash; D.C.</p>
+                            <p class="font-body text-[10px] text-white/70">Set-aside: 8(a)</p>
+                        </div>
+                    </foreignobject>
+                </g>
+            </svg>
+        </div>
+        <div class="absolute bottom-5 left-5 z-20 flex items-center gap-2 bg-white/90 backdrop-blur px-4 py-2 rounded-full border border-outline-variant/20 shadow-sm">
+            <span class="material-symbols-outlined text-primary-container text-base">map</span>
+            <span class="font-label text-xs font-semibold text-primary-container">Live Procurement Activity Map</span>
+        </div>
     </div>
 </div>
 </section>
