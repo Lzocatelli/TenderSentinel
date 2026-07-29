@@ -78,25 +78,38 @@
 
     html { scroll-behavior: smooth; }
 
-    /* Live procurement activity map */
-    .map-dot {
-        transition: all 0.3s ease;
+    /* ── Live procurement activity choropleth ──────────────────────────────
+       Sequential encoding: one hue (the brand orange), light -> dark, so the
+       colour reads as magnitude. Steps are the site's own orange tokens.
+       States with no tracked activity are deliberately OUTSIDE the ramp — a
+       cool near-surface fill — so "no data" never reads as "a little". */
+    .us-state {
+        fill: #eff4ff;
+        stroke: #ffffff;
+        stroke-width: 1;
+        stroke-linejoin: round;
+        transition: fill 0.25s ease;
     }
-    .map-dot-hit {
+    .us-state[data-bin="1"] { fill: #ffdbcb; }
+    .us-state[data-bin="2"] { fill: #ffb692; }
+    .us-state[data-bin="3"] { fill: #fc7218; }
+    .us-state[data-bin="4"] { fill: #9f4200; }
+
+    /* The hovered/focused mark lifts so the reader sees it respond. */
+    .us-state.state-active {
+        stroke: #131b2e;
+        stroke-width: 2;
+    }
+    .us-state[data-bin]:focus-visible {
+        outline: none;
+        stroke: #131b2e;
+        stroke-width: 2.5;
+    }
+    .us-state[data-bin] {
         cursor: pointer;
     }
-    .map-dot-group.dot-active .map-dot {
-        transform: scale(1.5);
-        filter: drop-shadow(0 0 8px #fc7218);
-    }
-    .tooltip {
-        visibility: hidden;
-        opacity: 0;
-        transition: opacity 0.2s ease-in-out;
-        pointer-events: none;
-    }
-    .tooltip.tooltip-visible {
-        visibility: visible;
+
+    #map-readout.readout-visible {
         opacity: 1;
     }
 </style>
@@ -190,53 +203,40 @@
 <div class="max-w-5xl mx-auto px-6">
     <div class="text-center mb-10 reveal">
         <h2 class="font-headline text-3xl font-extrabold tracking-tight mb-3">See it happening live.</h2>
-        <p class="text-on-surface-variant text-lg max-w-2xl mx-auto">A snapshot of federal opportunities being scored and matched across the country right now.</p>
+        <p class="text-on-surface-variant text-lg max-w-2xl mx-auto">
+            Every federal opportunity we've tracked, by place of performance.
+            <span id="map-total-line" class="block mt-2 font-label text-sm text-on-surface-variant/80"></span>
+        </p>
     </div>
-    <div class="relative w-full aspect-[1.8/1] max-w-4xl mx-auto overflow-hidden rounded-xl bg-white border border-outline-variant/20 shadow-lg reveal reveal-delay-1" style="background-image: radial-gradient(circle at 1px 1px, #dce9ff 1.5px, transparent 0); background-size: 24px 24px;">
-        <div class="relative z-10 w-full h-full flex items-center justify-center p-10">
-            <svg id="live-map-svg" class="w-full h-full" viewbox="0 0 1000 600">
-                <g id="live-map-dots">
-                    <!-- Fallback dots shown until /api/live-map responds; replaced with real data by JS below -->
-                    <g class="map-dot-group">
-                        <circle class="map-dot-hit" cx="350" cy="280" r="16" fill="transparent"></circle>
-                        <circle class="map-dot fill-secondary-container" cx="350" cy="280" r="6"></circle>
-                        <foreignobject class="tooltip" height="90" width="210" x="360" y="230">
-                            <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
-                                <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">Live Update</p>
-                                <p class="font-body text-xs font-bold">NAICS 541512 &mdash; Texas</p>
-                                <p class="font-body text-[10px] text-white/70">Set-aside: SDVOSB</p>
-                            </div>
-                        </foreignobject>
-                    </g>
-                    <g class="map-dot-group">
-                        <circle class="map-dot-hit" cx="650" cy="320" r="16" fill="transparent"></circle>
-                        <circle class="map-dot fill-secondary-container" cx="650" cy="320" r="6"></circle>
-                        <foreignobject class="tooltip" height="90" width="210" x="660" y="270">
-                            <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
-                                <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">New Match</p>
-                                <p class="font-body text-xs font-bold">NAICS 541330 &mdash; Virginia</p>
-                                <p class="font-body text-[10px] text-white/70">Set-aside: WOSB</p>
-                            </div>
-                        </foreignobject>
-                    </g>
-                    <g class="map-dot-group">
-                        <circle class="map-dot-hit" cx="500" cy="220" r="16" fill="transparent"></circle>
-                        <circle class="map-dot fill-secondary-container" cx="500" cy="220" r="6"></circle>
-                        <foreignobject class="tooltip" height="90" width="210" x="510" y="120">
-                            <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
-                                <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">Urgent</p>
-                                <p class="font-body text-xs font-bold">NAICS 541611 &mdash; D.C.</p>
-                                <p class="font-body text-[10px] text-white/70">Set-aside: 8(a)</p>
-                            </div>
-                        </foreignobject>
-                    </g>
-                </g>
+    <div class="relative w-full aspect-[1.8/1] max-w-4xl mx-auto overflow-hidden rounded-xl bg-white border border-outline-variant/20 shadow-lg reveal reveal-delay-1">
+        <div class="relative z-10 w-full h-full flex items-center justify-center p-2 sm:p-6 md:p-10">
+            <svg id="live-map-svg" class="w-full h-full" viewbox="0 0 1000 600" aria-labelledby="live-map-title">
+                <title id="live-map-title">Choropleth map of the United States shading each state by how many federal opportunities we have tracked there</title>
+                {% include "partials/_us_map_states.html" %}
             </svg>
         </div>
-        <div class="absolute bottom-5 left-5 z-20 flex items-center gap-2 bg-white/90 backdrop-blur px-4 py-2 rounded-full border border-outline-variant/20 shadow-sm">
-            <span class="material-symbols-outlined text-primary-container text-base">map</span>
-            <span class="font-label text-xs font-semibold text-primary-container">Live Procurement Activity Map</span>
+        <!-- Readout panel, not a floating tooltip: anchored in the empty
+             top-left corner so it never covers the state being read and never
+             needs edge-flip logic. Mirrored by aria-live for screen readers. -->
+        <div id="map-readout" class="absolute top-4 left-4 z-20 pointer-events-none opacity-0 transition-opacity duration-200 bg-primary-container text-white px-4 py-3 rounded-lg shadow-xl border border-white/10 min-w-[9rem]" aria-live="polite">
+            <p id="map-readout-value" class="font-headline text-2xl font-black leading-none"></p>
+            <p id="map-readout-label" class="font-body text-xs text-white/80 mt-1"></p>
+            <p id="map-readout-naics" class="font-label text-[10px] text-secondary-fixed-dim mt-2"></p>
         </div>
+        <!-- Bottom-right: the only corner Albers USA leaves empty (Alaska and
+             Hawaii sit bottom-left, New England top-right). -->
+        <div id="map-legend" class="absolute bottom-4 right-4 z-20 hidden sm:flex flex-col gap-1.5 bg-white/90 backdrop-blur px-3 py-2 rounded-lg border border-outline-variant/20 shadow-sm">
+            <span class="font-label text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">Opportunities tracked</span>
+            <div id="map-legend-scale" class="flex items-center gap-1"></div>
+        </div>
+    </div>
+
+    <!-- Relief channel: the map's values without needing a pointer. Also the
+         primary way this data reads on phones, where the map is small. -->
+    <div class="max-w-4xl mx-auto mt-8 reveal reveal-delay-2">
+        <h3 class="font-label text-xs uppercase tracking-widest text-on-surface-variant mb-4">Most active states</h3>
+        <ul id="state-activity-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-1"></ul>
+        <p id="state-activity-note" class="font-body text-xs text-on-surface-variant/70 mt-4"></p>
     </div>
 </div>
 </section>
@@ -625,106 +625,202 @@ async function updateCounter() {
 updateCounter();
 setInterval(updateCounter, 5 * 60 * 1000);
 
-// Live procurement activity map — approximate positions on the illustrative
-// US shape, not precise cartography.
-const STATE_INFO = {
-    AL: ["Alabama", 610, 350], AK: ["Alaska", 190, 470], AZ: ["Arizona", 270, 340],
-    AR: ["Arkansas", 520, 320], CA: ["California", 170, 290], CO: ["Colorado", 350, 260],
-    CT: ["Connecticut", 780, 170], DE: ["Delaware", 740, 210], DC: ["D.C.", 725, 225],
-    FL: ["Florida", 680, 440], GA: ["Georgia", 650, 370], HI: ["Hawaii", 260, 470],
-    ID: ["Idaho", 280, 180], IL: ["Illinois", 570, 220], IN: ["Indiana", 610, 220],
-    IA: ["Iowa", 510, 200], KS: ["Kansas", 440, 270], KY: ["Kentucky", 620, 250],
-    LA: ["Louisiana", 520, 380], ME: ["Maine", 810, 90], MD: ["Maryland", 730, 220],
-    MA: ["Massachusetts", 790, 150], MI: ["Michigan", 620, 150], MN: ["Minnesota", 500, 130],
-    MS: ["Mississippi", 570, 360], MO: ["Missouri", 520, 260], MT: ["Montana", 330, 120],
-    NE: ["Nebraska", 440, 220], NV: ["Nevada", 230, 250], NH: ["New Hampshire", 780, 120],
-    NJ: ["New Jersey", 750, 190], NM: ["New Mexico", 340, 340], NY: ["New York", 740, 150],
-    NC: ["North Carolina", 690, 280], ND: ["North Dakota", 430, 110], OH: ["Ohio", 660, 220],
-    OK: ["Oklahoma", 460, 320], OR: ["Oregon", 190, 190], PA: ["Pennsylvania", 720, 210],
-    RI: ["Rhode Island", 800, 160], SC: ["South Carolina", 680, 320], SD: ["South Dakota", 430, 170],
-    TN: ["Tennessee", 610, 290], TX: ["Texas", 430, 400], UT: ["Utah", 280, 260],
-    VT: ["Vermont", 760, 120], VA: ["Virginia", 700, 250], WA: ["Washington", 200, 130],
-    WV: ["West Virginia", 670, 240], WI: ["Wisconsin", 560, 150], WY: ["Wyoming", 320, 200],
-};
-const SET_ASIDE_LABELS = {
-    SBA: "Small Business", "8A": "8(a)", HZC: "HUBZone", WOSB: "WOSB",
-    EDWOSB: "EDWOSB", SDVOSB: "SDVOSB", VSB: "VOSB",
-};
-function daysAgoLabel(isoDate) {
-    if (!isoDate) return "Recently";
-    const days = Math.floor((Date.now() - new Date(isoDate)) / 86400000);
-    if (days <= 0) return "Today";
-    if (days === 1) return "1 day ago";
-    return `${days} days ago`;
+// ── Live procurement activity choropleth ───────────────────────────────────
+// Sequential encoding: states are shaded by how many opportunities we've tracked
+// there. Bin thresholds are computed server-side (quantiles) so the map and its
+// legend can never disagree.
+// Must mirror .us-state[data-bin="N"] in the stylesheet above.
+const BIN_COLORS = ['#ffdbcb', '#ffb692', '#fc7218', '#9f4200'];
+
+function binFor(count, thresholds) {
+    for (let i = 0; i < thresholds.length; i++) {
+        if (count <= thresholds[i]) return i + 1;
+    }
+    return thresholds.length;
 }
-const SVG_NS = 'http://www.w3.org/2000/svg';
-async function updateLiveMap() {
-    try {
-        const r = await fetch('/api/live-map');
-        const items = (await r.json()).filter(it => STATE_INFO[it.state]);
-        if (!items.length) return;
 
-        const container = document.getElementById('live-map-dots');
-        container.innerHTML = '';
-        items.slice(0, 6).forEach(it => {
-            const [stateName, cx, cy] = STATE_INFO[it.state];
-            const g = document.createElementNS(SVG_NS, 'g');
-            g.setAttribute('class', 'map-dot-group');
-
-            const hitArea = document.createElementNS(SVG_NS, 'circle');
-            hitArea.setAttribute('class', 'map-dot-hit');
-            hitArea.setAttribute('cx', cx);
-            hitArea.setAttribute('cy', cy);
-            hitArea.setAttribute('r', 16);
-            hitArea.setAttribute('fill', 'transparent');
-
-            const circle = document.createElementNS(SVG_NS, 'circle');
-            circle.setAttribute('class', 'map-dot fill-secondary-container');
-            circle.setAttribute('cx', cx);
-            circle.setAttribute('cy', cy);
-            circle.setAttribute('r', 6);
-
-            const fo = document.createElementNS(SVG_NS, 'foreignObject');
-            fo.setAttribute('class', 'tooltip');
-            fo.setAttribute('width', 210);
-            fo.setAttribute('height', 90);
-            fo.setAttribute('x', Math.min(cx + 10, 790));
-            fo.setAttribute('y', Math.max(cy - 50, 10));
-
-            const setAsideLabel = SET_ASIDE_LABELS[it.set_aside] || it.set_aside;
-            fo.innerHTML = `
-                <div class="bg-primary-container text-white p-3 rounded-lg shadow-xl text-left border border-white/10">
-                    <p class="font-label text-[10px] text-secondary-container font-bold uppercase tracking-wider mb-1">${daysAgoLabel(it.posted_date)}</p>
-                    <p class="font-body text-xs font-bold">NAICS ${it.naics_code} &mdash; ${stateName}</p>
-                    <p class="font-body text-[10px] text-white/70">${setAsideLabel ? 'Set-aside: ' + setAsideLabel : it.agency}</p>
-                </div>`;
-
-            g.appendChild(hitArea);
-            g.appendChild(circle);
-            g.appendChild(fo);
-            container.appendChild(g);
-        });
-        bindMapTooltips();
-    } catch (e) {}
+// Each generated state path carries its full name in a <title>, so that is the
+// single source of truth for labels — no parallel lookup table to drift.
+function stateName(code) {
+    const title = document.querySelector('.us-state[data-state="' + code + '"] title');
+    return (title && title.textContent) || code;
 }
-function bindMapTooltips() {
-    document.querySelectorAll('.map-dot-group').forEach(group => {
-        if (group.dataset.tooltipBound) return;
-        group.dataset.tooltipBound = 'true';
-        const tooltip = group.querySelector('.tooltip');
-        group.addEventListener('mouseenter', () => {
-            group.classList.add('dot-active');
-            tooltip.classList.add('tooltip-visible');
-        });
-        group.addEventListener('mouseleave', () => {
-            group.classList.remove('dot-active');
-            tooltip.classList.remove('tooltip-visible');
+
+// Readout text is set with textContent, never innerHTML: NAICS codes and state
+// values originate from the SAM.gov API, i.e. untrusted input.
+function fillReadout(code, count, topNaics) {
+    const value = document.getElementById('map-readout-value');
+    const label = document.getElementById('map-readout-label');
+    const naics = document.getElementById('map-readout-naics');
+    if (!value || !label || !naics) return;
+
+    // Value leads, label follows — the pointer already identified the state.
+    value.textContent = count.toLocaleString('en-US');
+    label.textContent = (count === 1 ? 'opportunity' : 'opportunities') + ' in ' + stateName(code);
+    naics.textContent = topNaics ? 'Top NAICS ' + topNaics : '';
+}
+
+function renderLegend(thresholds) {
+    const scale = document.getElementById('map-legend-scale');
+    if (!scale || !thresholds.length) return;
+    scale.textContent = '';
+
+    let lower = 1;
+    thresholds.forEach((upper, i) => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center gap-1';
+
+        const swatch = document.createElement('span');
+        swatch.className = 'inline-block w-4 h-3 rounded-sm';
+        swatch.style.backgroundColor = BIN_COLORS[i];
+        item.appendChild(swatch);
+
+        const text = document.createElement('span');
+        text.className = 'font-label text-[10px] text-on-surface-variant';
+        const isLast = i === thresholds.length - 1;
+        text.textContent = upper <= lower ? String(upper)
+            : (isLast ? `${lower}+` : `${lower}–${upper}`);
+        item.appendChild(text);
+
+        scale.appendChild(item);
+        lower = upper + 1;
+    });
+
+    const none = document.createElement('div');
+    none.className = 'flex items-center gap-1 ml-1';
+    const noneSwatch = document.createElement('span');
+    noneSwatch.className = 'inline-block w-4 h-3 rounded-sm border border-outline-variant/30';
+    noneSwatch.style.backgroundColor = '#eff4ff';
+    none.appendChild(noneSwatch);
+    const noneText = document.createElement('span');
+    noneText.className = 'font-label text-[10px] text-on-surface-variant';
+    noneText.textContent = 'none yet';
+    none.appendChild(noneText);
+    scale.appendChild(none);
+}
+
+function renderStateList(states, total, unknown) {
+    const list = document.getElementById('state-activity-list');
+    if (!list) return;
+    list.textContent = '';
+
+    states.slice(0, 12).forEach(s => {
+        const li = document.createElement('li');
+        li.className = 'flex items-baseline justify-between gap-3 py-1.5 border-b border-outline-variant/10';
+
+        const name = document.createElement('span');
+        name.className = 'font-body text-sm text-on-surface truncate';
+        name.textContent = stateName(s.state);
+        li.appendChild(name);
+
+        const count = document.createElement('span');
+        count.className = 'font-label text-sm font-semibold text-secondary shrink-0';
+        count.textContent = s.count.toLocaleString('en-US');
+        li.appendChild(count);
+
+        list.appendChild(li);
+    });
+
+    const note = document.getElementById('state-activity-note');
+    if (note) {
+        const parts = [];
+        if (states.length > 12) {
+            parts.push(`Plus ${(states.length - 12).toLocaleString('en-US')} more states with tracked activity.`);
+        }
+        if (unknown) {
+            // Be explicit rather than quietly dropping these from the map.
+            parts.push(`${unknown.toLocaleString('en-US')} opportunities aren't shown on the map because SAM.gov didn't specify a place of performance.`);
+        }
+        note.textContent = parts.join(' ');
+    }
+
+    const totalLine = document.getElementById('map-total-line');
+    if (totalLine && total) {
+        totalLine.textContent = `${total.toLocaleString('en-US')} opportunities tracked across ${states.length} states and territories.`;
+    }
+}
+
+function clearActiveStates() {
+    document.querySelectorAll('.us-state.state-active')
+        .forEach(el => el.classList.remove('state-active'));
+    const readout = document.getElementById('map-readout');
+    if (readout) readout.classList.remove('readout-visible');
+}
+
+function showStateTooltip(path) {
+    const readout = document.getElementById('map-readout');
+    if (!readout) return;
+    clearActiveStates();
+    path.classList.add('state-active');
+    fillReadout(path.dataset.state, Number(path.dataset.count), path.dataset.topNaics || '');
+    readout.classList.add('readout-visible');
+}
+
+function paintChoropleth(payload) {
+    const { states = [], thresholds = [], total = 0, unknown_state: unknown = 0 } = payload;
+
+    document.querySelectorAll('.us-state').forEach(el => {
+        el.removeAttribute('data-bin');
+        el.removeAttribute('tabindex');
+        el.removeAttribute('role');
+        delete el.dataset.count;
+        delete el.dataset.topNaics;
+    });
+
+    if (!states.length || !thresholds.length) return;
+
+    states.forEach(s => {
+        const path = document.querySelector(`.us-state[data-state="${s.state}"]`);
+        if (!path) return;
+        path.dataset.bin = String(binFor(s.count, thresholds));
+        path.dataset.count = String(s.count);
+        if (s.top_naics) path.dataset.topNaics = s.top_naics;
+        // Only states carrying data become focusable, so the landing page
+        // doesn't add 51 tab stops. The list below covers every state.
+        path.setAttribute('tabindex', '0');
+        path.setAttribute('role', 'button');
+        path.setAttribute('aria-label',
+            `${stateName(s.state)}: ${s.count} opportunities tracked`);
+    });
+
+    renderLegend(thresholds);
+    renderStateList(states, total, unknown);
+    bindStateInteractions();
+}
+
+function bindStateInteractions() {
+    document.querySelectorAll('.us-state[data-bin]').forEach(path => {
+        if (path.dataset.interactionBound) return;
+        path.dataset.interactionBound = 'true';
+        path.addEventListener('mouseenter', () => showStateTooltip(path));
+        path.addEventListener('mouseleave', clearActiveStates);
+        // Keyboard parity with hover.
+        path.addEventListener('focus', () => showStateTooltip(path));
+        path.addEventListener('blur', clearActiveStates);
+        // Touch: tapping always opens (a tap is preceded by an emulated
+        // mouseenter, so a toggle would immediately close it again).
+        path.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showStateTooltip(path);
         });
     });
 }
-bindMapTooltips();
-updateLiveMap();
-setInterval(updateLiveMap, 5 * 60 * 1000);
+
+document.addEventListener('click', clearActiveStates);
+
+async function updateStateActivity() {
+    try {
+        const r = await fetch('/api/state-activity');
+        if (!r.ok) return;
+        paintChoropleth(await r.json());
+    } catch (e) {
+        // Log rather than swallow: a silent catch here once hid a rendering bug
+        // that left the map painted but inert.
+        console.error('Live activity map failed to render', e);
+    }
+}
+updateStateActivity();
+setInterval(updateStateActivity, 5 * 60 * 1000);
 
 // Billing toggle
 let billingAnual = false;

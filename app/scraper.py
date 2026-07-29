@@ -15,8 +15,50 @@ logger = logging.getLogger("tendersentinel.scraper")
 SAM_API_URL = "https://api.sam.gov/opportunities/v2/search"
 
 
+PAGE_SIZE = 1000
+# Safety valve so a bad date range can't spin through the whole API and burn
+# the daily key quota. At PAGE_SIZE this covers 50k notices in one run.
+MAX_PAGES = 50
+
+
+def _fetch_page(params):
+    """Fetch a single page, retrying timeouts. Returns the parsed JSON body."""
+    for attempt in range(3):
+        try:
+            response = requests.get(SAM_API_URL, params=params, timeout=30)
+
+            if response.status_code == 200:
+                return response.json()
+
+            # Raise instead of returning [] — an empty list looks
+            # identical to "no new opportunities today" to every caller,
+            # so an expired key / exhausted quota / API change would
+            # silently save 0 results forever instead of surfacing as
+            # the failure it is (see fetch_and_alert's admin email,
+            # which only fires on a raised exception).
+            raise RuntimeError(
+                f"SAM.gov returned status {response.status_code}: {response.text[:500]}"
+            )
+
+        except requests.exceptions.Timeout:
+            logger.warning(f"SAM.gov timeout (attempt {attempt + 1}/3)")
+            if attempt < 2:
+                time.sleep(3)
+            else:
+                raise RuntimeError("SAM.gov did not respond after 3 attempts")
+
+    return {}
+
+
 def fetch_opportunities(date_from=None, date_to=None):
-    """Fetch opportunities from SAM.gov public API."""
+    """
+    Fetch opportunities from SAM.gov public API, following pagination.
+
+    SAM.gov caps a response at PAGE_SIZE records and reports the full match
+    count in `totalRecords`. Busy days exceed that cap, so this walks `offset`
+    until every page has been read — otherwise everything past the first page
+    is silently dropped and the database holds a truncated sample.
+    """
     if not date_from:
         date_from = (date.today() - timedelta(days=1)).strftime("%m/%d/%Y")
     if not date_to:
@@ -27,42 +69,43 @@ def fetch_opportunities(date_from=None, date_to=None):
         logger.error("SAM_API_KEY not set")
         return []
 
-    params = {
-        "api_key": api_key,
-        "postedFrom": date_from,
-        "postedTo": date_to,
-        "limit": 1000,
-        "offset": 0,
-    }
+    results = []
+    total_records = None
 
-    for attempt in range(3):
-        try:
-            response = requests.get(SAM_API_URL, params=params, timeout=30)
+    for page in range(MAX_PAGES):
+        offset = page * PAGE_SIZE
+        data = _fetch_page({
+            "api_key": api_key,
+            "postedFrom": date_from,
+            "postedTo": date_to,
+            "limit": PAGE_SIZE,
+            "offset": offset,
+        })
 
-            if response.status_code == 200:
-                data = response.json()
-                results = data.get("opportunitiesData", [])
-                logger.info(f"Fetched {len(results)} opportunities from SAM.gov")
-                return results
-            else:
-                # Raise instead of returning [] — an empty list looks
-                # identical to "no new opportunities today" to every caller,
-                # so an expired key / exhausted quota / API change would
-                # silently save 0 results forever instead of surfacing as
-                # the failure it is (see fetch_and_alert's admin email,
-                # which only fires on a raised exception).
-                raise RuntimeError(
-                    f"SAM.gov returned status {response.status_code}: {response.text[:500]}"
-                )
+        page_results = data.get("opportunitiesData") or []
+        results.extend(page_results)
 
-        except requests.exceptions.Timeout:
-            logger.warning(f"SAM.gov timeout (attempt {attempt + 1}/3)")
-            if attempt < 2:
-                time.sleep(3)
-            else:
-                raise RuntimeError("SAM.gov did not respond after 3 attempts")
+        if total_records is None:
+            total_records = data.get("totalRecords")
+            if total_records is not None:
+                logger.info(f"SAM.gov reports {total_records} matching opportunities")
 
-    return []
+        # Stop on a short page (the last one) or once we've read everything.
+        if len(page_results) < PAGE_SIZE:
+            break
+        if total_records is not None and len(results) >= total_records:
+            break
+
+        # Be gentle with the API between pages.
+        time.sleep(1)
+    else:
+        logger.warning(
+            f"Stopped paginating at MAX_PAGES ({MAX_PAGES}); "
+            f"{len(results)} fetched, API reported {total_records}"
+        )
+
+    logger.info(f"Fetched {len(results)} opportunities from SAM.gov")
+    return results
 
 
 def save_opportunities(opportunities):
