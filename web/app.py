@@ -3,6 +3,7 @@ import hmac
 import html as html_lib
 import io
 import logging
+import math
 import os
 import re
 import secrets
@@ -269,55 +270,95 @@ def count_opportunities_today():
     return total
 
 
-# ── Live Map Cache ───────────────────────────────────────────────────────────
+# ── State Activity Cache (landing page choropleth) ───────────────────────────
 
-_live_map_cache = {"items": [], "updated_at": None}
+_state_activity_cache = {"payload": None, "updated_at": None}
 
-
-def _shorten_agency(orgao):
-    if not orgao:
-        return "Federal Agency"
-    parts = [p.strip() for p in orgao.split(".") if p.strip()]
-    return parts[0] if parts else orgao
+# Number of colour bins the landing-page map paints. Kept here because the
+# thresholds are computed server-side so the map and its legend can't disagree.
+ACTIVITY_BINS = 4
 
 
-def get_live_map_opportunities():
+def _quantile_thresholds(counts, bins=ACTIVITY_BINS):
+    """
+    Upper bound of each bin, using quantiles over the states that have activity.
+
+    Federal procurement is heavily skewed (the DC/VA/MD cluster dwarfs everyone
+    else), so equal-width bins would paint one dark blob and leave the rest flat.
+    Quantiles keep every bin populated. Ties can collapse boundaries, so
+    duplicates are dropped and the bin count shrinks to what the data supports.
+    """
+    if not counts:
+        return []
+
+    ordered = sorted(counts)
+    thresholds = []
+    for i in range(1, bins + 1):
+        # Ceiling index of the i-th quantile.
+        idx = max(0, math.ceil(i * len(ordered) / bins) - 1)
+        thresholds.append(ordered[idx])
+
+    # Collapse ties while preserving order.
+    unique = []
+    for t in thresholds:
+        if not unique or t > unique[-1]:
+            unique.append(t)
+    return unique
+
+
+def get_state_activity():
+    """Per-state opportunity counts plus the bin thresholds used to colour them."""
     now = datetime.utcnow()
-    if (_live_map_cache["updated_at"] and
-            now - _live_map_cache["updated_at"] < timedelta(minutes=COUNTER_CACHE_TTL_MINUTES)):
-        return _live_map_cache["items"]
+    if (_state_activity_cache["payload"] is not None and
+            _state_activity_cache["updated_at"] and
+            now - _state_activity_cache["updated_at"] < timedelta(minutes=COUNTER_CACHE_TTL_MINUTES)):
+        return _state_activity_cache["payload"]
 
-    items = []
+    payload = {"states": [], "thresholds": [], "total": 0, "unknown_state": 0}
     try:
         conn = get_connection()
         cur = conn.cursor()
         try:
+            # Counts per state, plus that state's most common NAICS code.
             cur.execute("""
-                SELECT orgao, uf, naics_code, set_aside, data_publicacao
-                FROM licitacoes
-                WHERE uf IS NOT NULL AND naics_code IS NOT NULL
-                ORDER BY data_publicacao DESC NULLS LAST, criado_em DESC
-                LIMIT 8
+                SELECT uf,
+                       COUNT(*) AS total,
+                       (SELECT inner_l.naics_code
+                          FROM licitacoes inner_l
+                         WHERE inner_l.uf = l.uf
+                           AND inner_l.naics_code IS NOT NULL
+                         GROUP BY inner_l.naics_code
+                         ORDER BY COUNT(*) DESC, inner_l.naics_code
+                         LIMIT 1) AS top_naics
+                  FROM licitacoes l
+                 WHERE uf IS NOT NULL
+                 GROUP BY uf
+                 ORDER BY total DESC
             """)
             rows = cur.fetchall()
+
+            cur.execute("SELECT COUNT(*) FROM licitacoes WHERE uf IS NULL")
+            unknown = cur.fetchone()[0] or 0
         finally:
             cur.close()
             release_connection(conn)
 
-        for orgao, uf, naics_code, set_aside, data_publicacao in rows:
-            items.append({
-                "agency": _shorten_agency(orgao),
-                "state": uf,
-                "naics_code": naics_code,
-                "set_aside": set_aside,
-                "posted_date": data_publicacao.isoformat() if data_publicacao else None,
-            })
+        states = [
+            {"state": uf, "count": int(total), "top_naics": top_naics}
+            for uf, total, top_naics in rows
+        ]
+        payload = {
+            "states": states,
+            "thresholds": _quantile_thresholds([s["count"] for s in states]),
+            "total": sum(s["count"] for s in states),
+            "unknown_state": int(unknown),
+        }
     except Exception:
-        items = []
+        logger.exception("Failed to build state activity payload")
 
-    _live_map_cache["items"] = items
-    _live_map_cache["updated_at"] = now
-    return items
+    _state_activity_cache["payload"] = payload
+    _state_activity_cache["updated_at"] = now
+    return payload
 
 
 # ── Email validation helper (Q5) ─────────────────────────────────────────────
@@ -351,9 +392,9 @@ def api_contador():
     return jsonify({"total": count_opportunities_today()})
 
 
-@app.route("/api/live-map")
-def api_live_map():
-    return jsonify(get_live_map_opportunities())
+@app.route("/api/state-activity")
+def api_state_activity():
+    return jsonify(get_state_activity())
 
 
 @app.route("/health")

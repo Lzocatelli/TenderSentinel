@@ -80,28 +80,18 @@ function dropDegenerateSubpaths(d) {
 const clean = (d) => dropDegenerateSubpaths(round(d));
 
 const paths = [];
-const centroids = {};
 
 for (const state of states) {
   const usps = FIPS_TO_USPS[state.id];
   const d = path(state);
   if (!d) continue;
 
+  // The <title> doubles as the accessible name and as the front-end's only
+  // source for the state's display label.
   paths.push(
     `<path class="us-state" data-state="${usps}" d="${clean(d)}">` +
       `<title>${state.properties.name}</title></path>`
   );
-
-  // Use the projected path's visual centroid so dots land inside the shape
-  // even for states whose geographic centroid falls outside it.
-  const [cx, cy] = path.centroid(state);
-  if (Number.isFinite(cx) && Number.isFinite(cy)) {
-    centroids[usps] = [
-      +cx.toFixed(PRECISION),
-      +cy.toFixed(PRECISION),
-      state.properties.name,
-    ];
-  }
 }
 
 const svgPartial = `{# GENERATED FILE — do not edit by hand.
@@ -112,19 +102,10 @@ ${paths.join("\n")}
 </g>
 `;
 
-const centroidsJson = `{# GENERATED FILE — do not edit by hand.
-   Regenerate with: npm run build:map  (see scripts/generate_us_map.mjs) #}
-<script id="us-state-centroids" type="application/json">
-${JSON.stringify(centroids)}
-</script>
-`;
-
 writeFileSync("web/templates/partials/_us_map_states.html", svgPartial);
-writeFileSync("web/templates/partials/_us_state_centroids.html", centroidsJson);
 
 console.log(
   `Wrote ${states.length} state paths ` +
-    `(${(svgPartial.length / 1024).toFixed(1)} KB) and ` +
-    `${Object.keys(centroids).length} centroids ` +
+    `(${(svgPartial.length / 1024).toFixed(1)} KB) ` +
     `for a ${WIDTH}x${HEIGHT} viewBox.`
 );
