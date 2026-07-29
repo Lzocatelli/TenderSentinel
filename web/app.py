@@ -269,6 +269,57 @@ def count_opportunities_today():
     return total
 
 
+# ── Live Map Cache ───────────────────────────────────────────────────────────
+
+_live_map_cache = {"items": [], "updated_at": None}
+
+
+def _shorten_agency(orgao):
+    if not orgao:
+        return "Federal Agency"
+    parts = [p.strip() for p in orgao.split(".") if p.strip()]
+    return parts[0] if parts else orgao
+
+
+def get_live_map_opportunities():
+    now = datetime.utcnow()
+    if (_live_map_cache["updated_at"] and
+            now - _live_map_cache["updated_at"] < timedelta(minutes=COUNTER_CACHE_TTL_MINUTES)):
+        return _live_map_cache["items"]
+
+    items = []
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                SELECT orgao, uf, naics_code, set_aside, data_publicacao
+                FROM licitacoes
+                WHERE uf IS NOT NULL AND naics_code IS NOT NULL
+                ORDER BY data_publicacao DESC NULLS LAST, criado_em DESC
+                LIMIT 8
+            """)
+            rows = cur.fetchall()
+        finally:
+            cur.close()
+            release_connection(conn)
+
+        for orgao, uf, naics_code, set_aside, data_publicacao in rows:
+            items.append({
+                "agency": _shorten_agency(orgao),
+                "state": uf,
+                "naics_code": naics_code,
+                "set_aside": set_aside,
+                "posted_date": data_publicacao.isoformat() if data_publicacao else None,
+            })
+    except Exception:
+        items = []
+
+    _live_map_cache["items"] = items
+    _live_map_cache["updated_at"] = now
+    return items
+
+
 # ── Email validation helper (Q5) ─────────────────────────────────────────────
 
 _EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
@@ -298,6 +349,11 @@ def favicon():
 @app.route("/api/contador")
 def api_contador():
     return jsonify({"total": count_opportunities_today()})
+
+
+@app.route("/api/live-map")
+def api_live_map():
+    return jsonify(get_live_map_opportunities())
 
 
 @app.route("/health")
