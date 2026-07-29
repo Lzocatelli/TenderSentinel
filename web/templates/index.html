@@ -192,10 +192,9 @@
         <h2 class="font-headline text-3xl font-extrabold tracking-tight mb-3">See it happening live.</h2>
         <p class="text-on-surface-variant text-lg max-w-2xl mx-auto">A snapshot of federal opportunities being scored and matched across the country right now.</p>
     </div>
-    <div class="relative w-full aspect-[1.8/1] max-w-4xl mx-auto overflow-hidden rounded-xl bg-white border border-outline-variant/20 shadow-lg reveal reveal-delay-1">
+    <div class="relative w-full aspect-[1.8/1] max-w-4xl mx-auto overflow-hidden rounded-xl bg-white border border-outline-variant/20 shadow-lg reveal reveal-delay-1" style="background-image: radial-gradient(circle at 1px 1px, #dce9ff 1.5px, transparent 0); background-size: 24px 24px;">
         <div class="relative z-10 w-full h-full flex items-center justify-center p-10">
-            <svg id="live-map-svg" class="w-full h-full text-primary-container/10 fill-current" viewbox="0 0 1000 600">
-                <path d="M200,200 Q250,100 400,150 T600,120 T850,200 L900,400 Q800,500 600,450 T300,480 T150,350 Z" fill="none" stroke="currentColor" stroke-width="2"></path>
+            <svg id="live-map-svg" class="w-full h-full" viewbox="0 0 1000 600">
                 <g id="live-map-dots">
                     <!-- Fallback dots shown until /api/live-map responds; replaced with real data by JS below -->
                     <g class="map-dot-group">
