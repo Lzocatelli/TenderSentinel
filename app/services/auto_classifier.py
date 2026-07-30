@@ -4,6 +4,7 @@ Pre-classifies opportunities based on match score thresholds.
 """
 import logging
 
+from app.config import open_for_bids_filter
 from app.database import get_connection, release_connection
 
 logger = logging.getLogger("tendersentinel.auto_classifier")
@@ -81,7 +82,8 @@ def get_pipeline(user_id: int) -> dict:
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("""
+        frag, non_competitive = open_for_bids_filter()
+        cur.execute(f"""
             SELECT
                 l.id, l.sam_id, l.orgao, l.objeto, l.valor, l.deadline,
                 l.naics_code, l.set_aside, l.link,
@@ -95,9 +97,9 @@ def get_pipeline(user_id: int) -> dict:
                 ON d.opportunity_id = l.id AND d.user_id = %s
             LEFT JOIN opportunity_match_scores m
                 ON m.opportunity_id = l.id AND m.user_id = %s
-            WHERE l.deadline >= CURRENT_DATE OR l.deadline IS NULL
+            WHERE (l.deadline >= CURRENT_DATE OR l.deadline IS NULL) AND {frag}
             ORDER BY COALESCE(m.overall_score, 0) DESC
-        """, (user_id, user_id))
+        """, (user_id, user_id, non_competitive))
 
         pipeline = {"go": [], "consider": [], "skip": [], "unclassified": []}
         for row in cur.fetchall():
@@ -152,14 +154,16 @@ def get_pipeline_stats(user_id: int) -> dict:
                 total_value[row[0]] = float(row[2])
 
         # Count unclassified
-        cur.execute("""
+        frag, non_competitive = open_for_bids_filter()
+        cur.execute(f"""
             SELECT COUNT(*)
             FROM licitacoes l
             LEFT JOIN opportunity_decisions d
                 ON d.opportunity_id = l.id AND d.user_id = %s
             WHERE d.id IS NULL
             AND (l.deadline >= CURRENT_DATE OR l.deadline IS NULL)
-        """, (user_id,))
+            AND {frag}
+        """, (user_id, non_competitive))
         unclassified = cur.fetchone()[0]
 
         # Upcoming deadlines

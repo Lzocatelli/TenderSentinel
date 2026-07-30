@@ -32,7 +32,7 @@ from app.config import (BASE_URL, DASHBOARD_LIMIT, CSV_EXPORT_LIMIT,
                         COUNTER_CACHE_TTL_MINUTES, TRIAL_PERIOD_DAYS,
                         VALID_SET_ASIDES, PLAN_LIMITS, FREE_KEYWORD_LIMIT,
                         EMAIL_BANNER, ai_summary_enabled, get_plan_features,
-                        plan_display_name)
+                        open_for_bids_filter, plan_display_name)
 from app.database import create_tables, get_connection, release_connection
 from app.score import calculate_score
 from app.services.opportunity_agent import format_opportunities_slack, get_recent_opportunities
@@ -258,7 +258,12 @@ def count_opportunities_today():
     try:
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM licitacoes WHERE deadline >= CURRENT_DATE OR deadline IS NULL")
+        frag, non_competitive = open_for_bids_filter()
+        cur.execute(
+            f"SELECT COUNT(*) FROM licitacoes "
+            f"WHERE (deadline >= CURRENT_DATE OR deadline IS NULL) AND {frag}",
+            [non_competitive],
+        )
         total = cur.fetchone()[0] or 0
         cur.close()
         release_connection(conn)
@@ -319,25 +324,32 @@ def get_state_activity():
         conn = get_connection()
         cur = conn.cursor()
         try:
+            frag, non_competitive = open_for_bids_filter()
             # Counts per state, plus that state's most common NAICS code.
-            cur.execute("""
+            # The map only claims to show open, biddable work, so both the
+            # outer count and the "top NAICS" subquery apply the same filter.
+            cur.execute(f"""
                 SELECT uf,
                        COUNT(*) AS total,
                        (SELECT inner_l.naics_code
                           FROM licitacoes inner_l
                          WHERE inner_l.uf = l.uf
                            AND inner_l.naics_code IS NOT NULL
+                           AND {frag}
                          GROUP BY inner_l.naics_code
                          ORDER BY COUNT(*) DESC, inner_l.naics_code
                          LIMIT 1) AS top_naics
                   FROM licitacoes l
-                 WHERE uf IS NOT NULL
+                 WHERE uf IS NOT NULL AND {frag}
                  GROUP BY uf
                  ORDER BY total DESC
-            """)
+            """, [non_competitive, non_competitive])
             rows = cur.fetchall()
 
-            cur.execute("SELECT COUNT(*) FROM licitacoes WHERE uf IS NULL")
+            cur.execute(
+                f"SELECT COUNT(*) FROM licitacoes WHERE uf IS NULL AND {frag}",
+                [non_competitive],
+            )
             unknown = cur.fetchone()[0] or 0
         finally:
             cur.close()
@@ -633,6 +645,7 @@ def dashboard():
     filters_sql = " OR ".join(["l.objeto ILIKE %s"] * len(keywords))
     params_kw = [f"%{kw}%" for kw in keywords]
 
+    frag, non_competitive = open_for_bids_filter()
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(f"""
@@ -641,9 +654,10 @@ def dashboard():
         WHERE ({filters_sql})
           AND (%s IS NULL OR l.valor >= %s)
           AND (%s IS NULL OR l.uf = %s)
+          AND {frag}
         ORDER BY l.data_publicacao DESC
         LIMIT {DASHBOARD_LIMIT}
-    """, params_kw + [valor_min, valor_min, uf, uf])
+    """, params_kw + [valor_min, valor_min, uf, uf, non_competitive])
 
     rows = cur.fetchall()
     cur.close()
@@ -709,11 +723,12 @@ def search_now():
             try:
                 filters = " OR ".join(["l.objeto ILIKE %s"] * len(ckeywords))
                 params = [f"%{kw}%" for kw in ckeywords]
+                frag, non_competitive = open_for_bids_filter()
                 cur.execute(f"""
                     SELECT l.id, l.sam_id, l.orgao, l.objeto, l.valor, l.link
                     FROM licitacoes l
-                    WHERE {filters}
-                """, params)
+                    WHERE ({filters}) AND {frag}
+                """, params + [non_competitive])
                 candidates = cur.fetchall()
 
                 ids = [c[0] for c in candidates]
@@ -1608,11 +1623,12 @@ def api_profile_past_perf():
 def api_opportunities():
     scored = request.args.get("scored") == "true"
 
+    frag, non_competitive = open_for_bids_filter()
     conn = get_connection()
     cur = conn.cursor()
     try:
         if scored:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT l.id, l.sam_id, l.orgao, l.objeto, l.valor, l.deadline,
                        l.naics_code, l.set_aside, l.link,
                        m.overall_score, m.naics_score, m.setaside_score,
@@ -1622,22 +1638,22 @@ def api_opportunities():
                 FROM licitacoes l
                 LEFT JOIN opportunity_match_scores m
                     ON m.opportunity_id = l.id AND m.user_id = %s
-                WHERE l.deadline >= CURRENT_DATE OR l.deadline IS NULL
+                WHERE (l.deadline >= CURRENT_DATE OR l.deadline IS NULL) AND {frag}
                 ORDER BY COALESCE(m.overall_score, 0) DESC
                 LIMIT 100
-            """, (current_user.id,))
+            """, (current_user.id, non_competitive))
         else:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT id, sam_id, orgao, objeto, valor, deadline,
                        naics_code, set_aside, link,
                        NULL, NULL, NULL, NULL, NULL, NULL,
                        estimated_value_low, estimated_value_mid, estimated_value_high,
                        estimation_confidence
                 FROM licitacoes
-                WHERE deadline >= CURRENT_DATE OR deadline IS NULL
+                WHERE (deadline >= CURRENT_DATE OR deadline IS NULL) AND {frag}
                 ORDER BY data_publicacao DESC
                 LIMIT 100
-            """)
+            """, [non_competitive])
 
         opps = []
         for row in cur.fetchall():

@@ -130,6 +130,67 @@ TRIAL_PERIOD_DAYS = 7
 
 VALID_SET_ASIDES = {"SBA", "8A", "HZC", "WOSB", "EDWOSB", "SDVOSB", "VSB"}
 
+# ── SAM.gov notice types ─────────────────────────────────────────────────────
+#
+# SAM.gov's Contract Opportunities feed mixes several notice types in one
+# stream: open solicitations, but also presolicitation forecasts, sources-sought
+# market research, award notices (the contract is already decided), sole-source
+# justifications, and a few rarer ones. None of those last few are something a
+# user can bid on today, so counting them as "opportunities" alongside open
+# solicitations inflates every count derived from `licitacoes`.
+#
+# This is a BLOCKLIST, not an allowlist: an unrecognized or newly-introduced
+# notice_type value defaults to INCLUDED. SAM.gov can rename or add types, and
+# `notice_type` is NULL for rows ingested before this field existed — in both
+# cases the safe failure mode is "still show it" rather than silently hiding a
+# real open solicitation because we didn't recognize its label.
+#
+# Reflects the taxonomy SAM.gov's public API documented at the time this was
+# written (the "type" field on each item in `opportunitiesData`) — verify
+# against a live API response if these ever look stale.
+NON_COMPETITIVE_NOTICE_TYPES = {
+    "Presolicitation",
+    "Sources Sought",
+    "Special Notice",
+    "Award Notice",
+    "Justification",
+    "Sale of Surplus Property",
+    "Intent to Bundle Requirements (DoD-Funded)",
+    "Fair Opportunity / Limited Sources Justification",
+}
+
+# Display labels, e.g. for a badge on the dashboard. Falls back to the raw
+# notice_type (or "Opportunity" if unset) for anything not listed here.
+NOTICE_TYPE_LABELS = {
+    "Solicitation": "Open for bids",
+    "Combined Synopsis/Solicitation": "Open for bids",
+    "Presolicitation": "Forecast",
+    "Sources Sought": "Sources sought",
+    "Special Notice": "Special notice",
+    "Award Notice": "Awarded",
+    "Justification": "Sole source",
+    "Sale of Surplus Property": "Surplus sale",
+    "Intent to Bundle Requirements (DoD-Funded)": "Bundling intent",
+    "Fair Opportunity / Limited Sources Justification": "Limited sources",
+}
+
+
+def open_for_bids_filter():
+    """
+    SQL fragment (and its one param) that excludes known non-competitive
+    notice types from a `licitacoes` query. `notice_type` only exists on that
+    table, so this is safe to drop into any query touching it regardless of
+    alias or joins.
+
+    Usage:
+        frag, non_competitive = open_for_bids_filter()
+        cur.execute(f"SELECT ... WHERE ... AND {frag}", [*other_params, non_competitive])
+    """
+    return (
+        "(notice_type IS NULL OR NOT (notice_type = ANY(%s)))",
+        list(NON_COMPETITIVE_NOTICE_TYPES),
+    )
+
 # ── Email banner (shared by alertas and relatorio) ───────────────────────────
 
 EMAIL_BANNER = """

@@ -9,6 +9,7 @@ optionally narrowed by NAICS code.
 
 import logging
 
+from app.config import open_for_bids_filter
 from app.database import get_connection, release_connection
 from app.utils import format_currency
 
@@ -19,25 +20,27 @@ DEFAULT_LIMIT = 5
 
 def get_recent_opportunities(naics_code: str | None = None, limit: int = DEFAULT_LIMIT) -> list[dict]:
     """Most recently ingested opportunities, optionally filtered by NAICS code."""
+    frag, non_competitive = open_for_bids_filter()
     conn = get_connection()
     cur = conn.cursor()
     try:
         if naics_code:
             cur.execute(
-                """SELECT orgao, objeto, valor, naics_code, link, criado_em
+                f"""SELECT orgao, objeto, valor, naics_code, link, criado_em
                    FROM licitacoes
-                   WHERE naics_code = %s
+                   WHERE naics_code = %s AND {frag}
                    ORDER BY criado_em DESC
                    LIMIT %s""",
-                (naics_code, limit),
+                (naics_code, non_competitive, limit),
             )
         else:
             cur.execute(
-                """SELECT orgao, objeto, valor, naics_code, link, criado_em
+                f"""SELECT orgao, objeto, valor, naics_code, link, criado_em
                    FROM licitacoes
+                   WHERE {frag}
                    ORDER BY criado_em DESC
                    LIMIT %s""",
-                (limit,),
+                (non_competitive, limit),
             )
         rows = cur.fetchall()
         return [

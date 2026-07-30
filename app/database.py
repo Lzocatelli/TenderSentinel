@@ -108,6 +108,8 @@ def create_tables():
         ("licitacoes", "deadline", "DATE"),
         ("licitacoes", "naics_code", "TEXT"),
         ("licitacoes", "set_aside", "TEXT"),
+        ("licitacoes", "notice_type", "TEXT"),
+        ("licitacoes", "solicitation_number", "TEXT"),
         ("clientes", "plano", "TEXT"),
         ("clientes", "stripe_customer_id", "TEXT"),
         ("clientes", "stripe_subscription_id", "TEXT"),
@@ -154,6 +156,11 @@ def create_tables():
         "CREATE INDEX IF NOT EXISTS idx_alertas_licitacao ON alertas_enviados(licitacao_id)",
         "CREATE INDEX IF NOT EXISTS idx_newsletter_email ON newsletter(email)",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_google_id ON clientes(google_id) WHERE google_id IS NOT NULL",
+        # Amendments to the same solicitation share this number but get a new
+        # sam_id each time; save_opportunities() updates the existing row
+        # in place instead of inserting a duplicate when it matches.
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_licitacoes_solicitation_number "
+        "ON licitacoes(solicitation_number) WHERE solicitation_number IS NOT NULL",
     ]
     for idx_sql in indexes:
         try:

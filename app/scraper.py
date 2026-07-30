@@ -6,6 +6,7 @@ from datetime import date, timedelta
 import requests
 from dotenv import load_dotenv
 
+from app.config import NON_COMPETITIVE_NOTICE_TYPES
 from app.database import get_connection, release_connection
 
 load_dotenv()
@@ -109,7 +110,18 @@ def fetch_opportunities(date_from=None, date_to=None):
 
 
 def save_opportunities(opportunities):
-    """Save opportunities to the database. Returns count of new records."""
+    """
+    Save opportunities to the database. Returns count of new records.
+
+    SAM.gov gives an amendment to an existing solicitation a brand new
+    `noticeId`, so keying only on that (the old behavior) turned every
+    amendment into a duplicate row. When `solicitationNumber` is present, this
+    updates the matching existing row in place instead — the opportunity's
+    row `id` stays stable, so alerts already sent, scores, and go/consider/skip
+    decisions stay attached to it across amendments. Notices without a
+    solicitation number (some early postings lack one) fall back to the
+    original sam_id-keyed insert.
+    """
     if not opportunities:
         logger.info("No opportunities to save")
         return 0
@@ -117,7 +129,7 @@ def save_opportunities(opportunities):
     conn = get_connection()
     cur = conn.cursor()
     saved = 0
-    new_ids = []
+    new_ids = []  # rows that just became relevant to score/alert on
 
     for item in opportunities:
         try:
@@ -130,12 +142,10 @@ def save_opportunities(opportunities):
             posted_raw = item.get("postedDate")
             posted = posted_raw[:10] if posted_raw else None
 
-            cur.execute("""
-                INSERT INTO licitacoes
-                    (sam_id, orgao, objeto, data_publicacao, link, uf, naics_code, set_aside, deadline)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (sam_id) DO NOTHING
-            """, (
+            notice_type = item.get("type") or None
+            solicitation_number = item.get("solicitationNumber") or None
+
+            fields = (
                 item.get("noticeId"),
                 item.get("fullParentPathName"),
                 item.get("title"),
@@ -145,16 +155,57 @@ def save_opportunities(opportunities):
                 item.get("naicsCode"),
                 item.get("typeOfSetAside") or None,
                 deadline,
-            ))
-            if cur.rowcount > 0:
-                saved += 1
-                # Get the ID for scoring pipeline
+                notice_type,
+                solicitation_number,
+            )
+
+            existing_id, previous_notice_type = None, None
+            if solicitation_number:
                 cur.execute(
-                    "SELECT id FROM licitacoes WHERE sam_id = %s",
-                    (item.get("noticeId"),),
+                    "SELECT id, notice_type FROM licitacoes WHERE solicitation_number = %s",
+                    (solicitation_number,),
                 )
                 row = cur.fetchone()
                 if row:
+                    existing_id, previous_notice_type = row
+
+            if existing_id:
+                cur.execute("""
+                    UPDATE licitacoes SET
+                        sam_id = %s, orgao = %s, objeto = %s, data_publicacao = %s,
+                        link = %s, uf = %s, naics_code = %s, set_aside = %s,
+                        deadline = %s, notice_type = %s
+                    WHERE id = %s
+                """, fields[:9] + (fields[9], existing_id))
+
+                # An amendment that turns a forecast/sources-sought notice into
+                # an actual open solicitation should now be scored and alerted
+                # on — it wasn't eligible before. A previously-NULL notice_type
+                # was already being treated as open (see NON_COMPETITIVE_NOTICE_TYPES'
+                # default-include policy), so that transition doesn't count as
+                # "newly opened", and a plain re-posting of the same type
+                # shouldn't re-trigger either.
+                was_non_competitive = previous_notice_type in NON_COMPETITIVE_NOTICE_TYPES
+                is_now_competitive = notice_type not in NON_COMPETITIVE_NOTICE_TYPES
+                if was_non_competitive and is_now_competitive:
+                    new_ids.append(existing_id)
+                continue
+
+            cur.execute("""
+                INSERT INTO licitacoes
+                    (sam_id, orgao, objeto, data_publicacao, link, uf, naics_code,
+                     set_aside, deadline, notice_type, solicitation_number)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (sam_id) DO NOTHING
+                RETURNING id
+            """, fields)
+            row = cur.fetchone()
+            if row:
+                saved += 1
+                # Score/estimate only what's actually biddable — no point
+                # running the pipeline on an award notice or a sole-source
+                # justification.
+                if notice_type not in NON_COMPETITIVE_NOTICE_TYPES:
                     new_ids.append(row[0])
         except Exception as e:
             logger.error(f"Error saving opportunity: {e}")
