@@ -3,7 +3,7 @@ Scoring pipeline — orchestrates match scoring, value estimation, and auto-clas
 """
 import logging
 
-from app.config import get_plan_features
+from app.config import get_plan_features, open_for_bids_filter
 from app.database import get_connection, release_connection
 from app.services.match_scorer import MatchScorer
 from app.services.value_estimator import ContractValueEstimator
@@ -194,9 +194,11 @@ def rescore_user_opportunities(user_id: int):
     conn = get_connection()
     cur = conn.cursor()
     try:
+        frag, non_competitive = open_for_bids_filter()
         cur.execute(
             "SELECT id, sam_id, orgao, objeto, valor, naics_code, set_aside, estimated_value_mid "
-            "FROM licitacoes WHERE deadline >= CURRENT_DATE OR deadline IS NULL"
+            f"FROM licitacoes WHERE (deadline >= CURRENT_DATE OR deadline IS NULL) AND {frag}",
+            [non_competitive],
         )
         rows = cur.fetchall()
 

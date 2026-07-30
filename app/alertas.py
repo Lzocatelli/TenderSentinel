@@ -10,7 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 
-from app.config import BASE_URL, EMAIL_BANNER
+from app.config import BASE_URL, EMAIL_BANNER, open_for_bids_filter
 from app.database import get_connection, release_connection
 from app.utils import keyword_limit, format_currency
 
@@ -151,11 +151,12 @@ def dispatch_alerts():
 
         filters = " OR ".join(["l.objeto ILIKE %s"] * len(keywords))
         params = [f"%{kw}%" for kw in keywords]
+        frag, non_competitive = open_for_bids_filter()
         cur.execute(f"""
             SELECT l.id, l.sam_id, l.orgao, l.objeto, l.valor, l.link
             FROM licitacoes l
-            WHERE {filters}
-        """, params)
+            WHERE ({filters}) AND {frag}
+        """, params + [non_competitive])
         candidates = cur.fetchall()
 
         if not candidates:
