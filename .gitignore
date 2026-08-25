@@ -6,16 +6,45 @@
 # Python virtual environments
 venv/
 .venv/
+env/
 
 # Python cache
 __pycache__/
 *.py[cod]
+*.pyc
 .pytest_cache/
+*.egg-info/
+dist/
+build/
 
 # Node
 node_modules/
+package-lock.json (opcional)
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+dump.sql
+
+# Logs
+*.log
+logs/
 
 # Local / internal files
 CLAUDE.md
 tendersentinel_linkedin_posts.docx
 TENDERSENTINEL_IMPLEMENTATION.md
+
+# OS
+.DS_Store
+Thumbs.db
