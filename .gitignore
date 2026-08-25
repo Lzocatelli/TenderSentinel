@@ -1,10 +1,21 @@
-venv/
+# Environment / secrets
 .env
+.env.*
+!.env.example
+
+# Python virtual environments
+venv/
+.venv/
+
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+
+# Node
+node_modules/
+
+# Local / internal files
 CLAUDE.md
 tendersentinel_linkedin_posts.docx
-TENDERSENTINEL_IMPLEMENTATION
-node_modules/
-# Local Python virtualenv used for testing
-.venv/
+TENDERSENTINEL_IMPLEMENTATION.md
